@@ -6,21 +6,22 @@
 'use strict';
 
 /* ---------- Enemigos y golpes ---------- */
+// fx: golpe del director (movimiento de la batuta, del cuerpo y su efecto); death: cómo cae el enemigo afinado (ver burst y drawDying)
 const FOES={
-  negra:{fig:'Negra', name:'Nota gruñona', hit:'Batutazo', fx:'batuta', spr:'o_negra'},
-  corchea:{fig:'Corchea', name:'Nota con banderín', hit:'Corte rápido (llegan de dos en dos)', fx:'corte', spr:'o_corchea'},
-  semicorchea:{fig:'Semicorchea', name:'Nota de dos banderines', hit:'Trémolo', fx:'tremolo', spr:'o_semicorchea'},
-  tresillo:{fig:'Tresillo', name:'Trío desafinado', hit:'Giro de batuta en cada nota', fx:'giro', spr:'o_tresillo'},
-  blanca:{fig:'Blanca', name:'Nota blanca', hit:'Nota sostenida: en piano, mantén lo que dura; si sueltas antes, contraataca', fx:'sost', spr:'o_blanca'},
-  redonda:{fig:'Redonda', name:'Redonda, jefa de la escena', short:'Jefa de la escena', hit:'Calderón largo: como la blanca, mantén lo que dura', fx:'sost', spr:'o_redonda'},
-  silencio:{fig:'Silencio', name:'Silencio fantasma', hit:'No se toca: si lo golpeas, pierdes un corazón', fx:'', spr:'o_silencio'},
+  negra:{fig:'Negra', name:'Nota gruñona', hit:'Batutazo: salta y la aplasta contra las tablas', fx:'batuta', death:'squash', spr:'o_negra'},
+  corchea:{fig:'Corchea', name:'Nota con banderín', hit:'Tajo rápido que la parte en dos (llegan de dos en dos, un tajo de ida y otro de vuelta)', fx:'corte', death:'split', spr:'o_corchea'},
+  semicorchea:{fig:'Semicorchea', name:'Nota de dos banderines', hit:'Trémolo eléctrico: un rayo que la hace estallar en pedazos', fx:'tremolo', death:'shatter', spr:'o_semicorchea'},
+  tresillo:{fig:'Tresillo', name:'Trío desafinado', hit:'Giro de batuta en cada nota; al tercero sale girando', fx:'giro', death:'spin', spr:'o_tresillo'},
+  blanca:{fig:'Blanca', name:'Nota blanca', hit:'Rayo sostenido: en piano, mantén lo que dura (si sueltas antes, contraataca); al acabar sube convertida en notas', fx:'sost', death:'ascend', spr:'o_blanca'},
+  redonda:{fig:'Redonda', name:'Redonda, jefa de la escena', short:'Jefa de la escena', hit:'Calderón largo: como la blanca, mantén lo que dura', fx:'sost', death:'ascend', spr:'o_redonda'},
+  silencio:{fig:'Silencio', name:'Silencio fantasma', hit:'No se toca: si lo golpeas, pierdes un corazón (en fácil, solo se ríe)', fx:'', death:'', spr:'o_silencio'},
 };
 const LONG=new Set(['blanca','redonda']);   // notas que en modo piano hay que sostener
 function kindOf(e){ if(e.rest) return 'silencio'; if(e.tuplet) return 'tresillo'; const d=e.dur; return d>=48?'redonda':d>=24?'blanca':d>=12?'negra':d>=6?'corchea':'semicorchea'; }
 const dotted=e=>!e.rest && [36,18].includes(e.dur);   // variante con puntillo del mismo enemigo
 const figKey=e=>e.rest?'r':e.tuplet?'t':DUR2K[e.dur];
 const MULT=c=>Math.min(4,1+Math.floor(c/5));   // multiplicador de combo: ×2 desde 5 aciertos seguidos, ×3 desde 10, ×4 desde 15
-const HEARTS=5, GRACE=0.06;   // margen tras la ventana de la nota antes de darla por no tocada (el toque llega con su e.timeStamp algo después)
+const GRACE=0.06;   // margen tras la ventana de la nota antes de darla por no tocada (el toque llega con su e.timeStamp algo después)
 
 /* ---------- Sprites (pixel art 16×16, ambientación «Orquesta desafinada») ---------- */
 const PAL={K:'#1b1424',k:'#3a2f4a',W:'#f4f1ea',w:'#cfc9d8',Q:'#3c3c3c',T:'#ffd9b0',R:'#d9413a',E:'#ffffff',Y:'#f2c14e'};
@@ -38,10 +39,11 @@ o_silencio:['................','......K.........','.......K........','......KK..
 // Puntillo: un punto a la derecha de la cabeza (fila 11)
 function dotRows(rows){ return rows.map((r,y)=>{ if(y!==11) return r; const c=Math.min(15,r.replace(/\.+$/,'').length+1); return r.slice(0,c)+'K'+r.slice(c+1); }); }
 const sprC={}, footC={};
+const rowsOf=key=>key.endsWith('.') ? dotRows(SPR[key.slice(0,-1)]) : SPR[key];
 // mode: '' normal · 'w' silueta clara (borde para que se vea sobre el escenario oscuro) · 'f' blanca (destello) · 'r' roja (herida) · 'g' fantasma
 function sprite(key, mode){
   const k=key+'|'+mode; if(sprC[k]) return sprC[k];
-  const dot=key.endsWith('.'), rows=dot ? dotRows(SPR[key.slice(0,-1)]) : SPR[key];
+  const rows=rowsOf(key);
   const c=document.createElement('canvas'); c.width=16; c.height=16; const x=c.getContext('2d');
   const col=ch=>mode==='w'?'#f2e6c9':mode==='f'?'#ffffff':mode==='r'?'#d9413a':mode==='g'?(ch==='K'?'#d8cfe6':PAL[ch]):PAL[ch];
   rows.forEach((r,y)=>{ for(let i=0;i<16;i++){ const ch=r[i]; if(ch==='.') continue; x.fillStyle=col(ch); x.fillRect(i,y,1,1); } });
@@ -99,7 +101,7 @@ const reduce=()=>reduceMQ.matches;   // movimiento reducido: sin sacudidas, dest
 const now=()=>performance.now()/1000;
 
 /* ---------- Estado de la pasada ---------- */
-let run=null;          // pasada en curso o la última: {demo, live, hearts, combo, maxCombo, pts, evs, ptr, groups, hits, nHeads, lost}
+let run=null;          // pasada en curso o la última: {demo, live, hearts, max, extraHurts, combo, maxCombo, pts, evs, ptr, groups, hits, nHeads, lost, vary}
 let actors=[], parts=[], texts=[], dir={a:'idle',t0:0}, shake=-9, curtain={c0:0,c1:0,t0:0,dur:0}, banner=null;
 const curtainAt=pn=>{ const c=curtain; if(pn>=c.t0+c.dur || !c.dur) return c.c1; return c.c0+(c.c1-c.c0)*Math.max(0,(pn-c.t0)/c.dur); };
 function setCurtain(to, dur){ const pn=now(); curtain={c0:curtainAt(pn), c1:to, t0:pn, dur:reduce()?0:dur}; }
@@ -118,7 +120,9 @@ function spawn(x, pt){
   if(x.gk && run.groups.has(x.gk)) return x.actor=run.groups.get(x.gk);
   const e=x.e, sc=scene(), big=!!sc.boss && figKey(e)===sc.boss && !e.tie, key=FOES[x.kind].spr+(dotted(e)?'.':''), spt=S.spt;
   const len=(x.gk?12:e.rest||e.tie?e.dur:e.len)*spt;
-  const a={kind:x.kind, key, big, s:big?4:3, x:big?98:104, t0:pt, te:Math.min(0.12,Math.max(0.05,len*0.4)), end:pt+len, st:'enter', heads:x.gk?3:1, done:0, flash:-9, laugh:-9};
+  // v: variante del golpe (0/1), alterna entre enemigos seguidos (tajo de ida y de vuelta, batutazo por arriba y por abajo)
+  const a={kind:x.kind, key, big, s:big?4:3, x:big?98:104, t0:pt, te:Math.min(0.12,Math.max(0.05,len*0.4)), end:pt+len, st:'enter', heads:x.gk?3:1, done:0, flash:-9, laugh:-9,
+    death:FOES[x.kind].death, v:(run.vary++)%2};
   if(e.rest){ a.st='ghost'; a.life=Math.max(0.9,len); a.s=3; }
   else { a.x=slotX(big); if(e.tie) a.calm=true; }
   actors.push(a); x.actor=a; if(x.gk) run.groups.set(x.gk,a);
@@ -126,24 +130,60 @@ function spawn(x, pt){
   else if(e.rest) cap('Silencio → fantasma: no se toca', null);
   return a;
 }
-function die(a,pn){ a.st='dying'; a.t1=pn; if(!reduce()) sparkles(a); }
-function sparkles(a){
-  const c=center(a,now());
-  for(let i=0;i<12;i++){ const ang=Math.random()*Math.PI*2, sp=25+Math.random()*35;
-    parts.push({x:c[0],y:c[1],vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp-20,t0:now(),life:.35+Math.random()*.2,col:i%3?'#f2c14e':'#ffffff'}); }
+// Duración de cada forma de caer (con movimiento reducido, todas son un fundido de 0,35 s sin partículas)
+const DIE_T={squash:.4, split:.5, shatter:.04, spin:.5, ascend:.8};
+function die(a,pn){ a.st='dying'; a.t1=pn; a.dd=reduce()?.35:(DIE_T[a.death]||.35); if(!reduce()) burst(a,pn); }
+// Partículas: px (cuadrado de sz píxeles con gravedad gr), note (corchea de 4×5), ring (onda que crece; ry la aplasta), star (destello en cruz)
+const P=o=>parts.push({t0:now(), sz:1, gr:40, vx:0, vy:0, ...o});
+const rnd=(a,b)=>a+Math.random()*(b-a);
+function burst(a,pn){
+  const [x,y]=pos(a,pn), s=a.s, c=center(a,pn);
+  switch(a.death){
+    case 'squash':   // polvo a los lados y una onda en las tablas
+      for(let i=0;i<10;i++){ const d=i%2?1:-1; P({x:c[0]+d*rnd(2,6)*s, y:77, vx:d*rnd(20,55), vy:-rnd(8,28), life:rnd(.35,.55), col:i%3?'#c9a27a':'#f4f1ea', sz:2, gr:70}); }
+      P({kind:'ring', x:c[0], y:78, r0:3, r1:9*s, ry:.22, life:.35, col:'#f2c14e'});
+      break;
+    case 'split':    // chispas a lo largo del tajo
+      for(let i=0;i<8;i++){ const k=i/7; P({x:c[0]-12+24*k, y:c[1]+(a.v?6:-6)*(1-2*k), vx:rnd(-20,20), vy:-rnd(10,35), life:rnd(.25,.4), col:i%2?'#ffffff':'#cfc9d8'}); }
+      break;
+    case 'shatter': {   // estalla: cada píxel del sprite sale despedido
+      rowsOf(a.key).forEach((r,ry)=>{ for(let i=0;i<16;i++){ const ch=r[i]; if(ch==='.') continue;
+        const px=x+i*s, py=y+ry*s, dx=px-c[0], dy=py-c[1], d=Math.hypot(dx,dy)||1, sp=rnd(35,95);
+        P({x:px, y:py, vx:dx/d*sp+rnd(-10,10), vy:dy/d*sp-rnd(20,45), life:rnd(.4,.75), col:PAL[ch], sz:s, gr:170}); } });
+      P({kind:'star', x:c[0], y:c[1], r1:10, life:.22, col:'#ffffff'});
+      break; }
+    case 'spin':     // el trío sale girando y suelta sus tres notas
+      for(let k=0;k<3;k++){ const an=-Math.PI/2+(k-1)*0.85; P({kind:'note', x:c[0]-2, y:c[1]-8, vx:Math.cos(an)*50, vy:Math.sin(an)*50, life:.65, col:'#f2c14e', gr:35}); }
+      break;
+    case 'ascend':   // sube convertida en notas
+      for(let k=0;k<7;k++) P({kind:'note', x:c[0]-18+k*6+rnd(0,3), y:c[1]-rnd(0,14), vx:rnd(-6,6), vy:-rnd(22,42), life:rnd(.8,1.1), col:k%2?'#f2c14e':'#f4f1ea', gr:0, sway:1});
+      P({kind:'ring', x:c[0], y:c[1], r0:4, r1:12*s, ry:.7, life:.45, col:'#f2c14e'});
+      break;
+  }
 }
 // Efecto de un acierto: el director golpea con el movimiento de esa figura
+const SAY_EXACT=['¡AFINADA!','¡PERFECTA!','¡EXACTA!'], SAY_GOOD=['¡BIEN!','¡AFINADA!'];
+const pick=l=>l[Math.floor(Math.random()*l.length)];
 function strike(x, pn, cls, gain){
   const a=x.actor, fx=FOES[x.kind].fx;
   if(x.kind==='tresillo'){ a.done++; a.flash=pn; if(a.done+(a.missed||0)>=a.heads){ a.st='hit'; a.t1=pn; } }
   else if(LONG.has(x.kind)){ a.st='held'; a.t1=pn; }
   else { a.st='hit'; a.t1=pn; }
-  dir={a:'strike', fx, t0:pn, tgt:a};
+  dir={a:'strike', fx, t0:pn, tgt:a, v:a.v};
+  const c=center(a,pn);
+  if(!reduce()){
+    // destello del acierto: anillo dorado y cruz en el exacto, anillo blanco en el bien, nada en el cerca
+    if(cls==='exact'){ P({kind:'ring', x:c[0], y:c[1], r0:3, r1:16, life:.3, col:'#f2c14e', t0:pn}); P({kind:'star', x:c[0], y:c[1]-4, r1:7, life:.2, col:'#ffffff', t0:pn}); }
+    else if(cls==='good') P({kind:'ring', x:c[0], y:c[1], r0:3, r1:10, life:.25, col:'#f4f1ea', t0:pn});
+    // cada nota del trío afinada salta como una corchea dorada
+    if(x.kind==='tresillo'){ const [ax,ay]=pos(a,pn), hx=ax+[3,8,13][Math.min(2,a.done-1)]*a.s; P({kind:'note', x:hx-2, y:ay+8*a.s, vx:rnd(-12,12), vy:-55, life:.5, col:'#f2c14e', gr:90, t0:pn}); }
+  }
   if(run.demo) return;
-  const c=center(a,pn), top=a.big?24:34;
+  const top=a.big?24:34;
   if(cls==='near') texts.push({s:'CERCA', x:c[0], y:top, col:'#f4f1ea', t0:pn, dur:.6, sc:1});
-  else texts.push({s:'¡AFINADA!', x:Math.min(190,Math.max(60,c[0])), y:top-8, col:cls==='exact'?'#f2c14e':'#f4f1ea', t0:pn, dur:.7, sc:cls==='exact'?2:1});
+  else texts.push({s:pick(cls==='exact'?SAY_EXACT:SAY_GOOD), x:Math.min(190,Math.max(60,c[0])), y:top-8, col:cls==='exact'?'#f2c14e':'#f4f1ea', t0:pn, dur:.7, sc:cls==='exact'?2:1});
   texts.push({s:'+'+gain, x:c[0]+14, y:top+(cls==='exact'?6:4), col:'#f4f1ea', t0:pn, dur:.6, sc:1});
+  if(cls!=='near' && run.combo>=5 && run.combo%5===0) texts.push({s:`COMBO ×${MULT(run.combo)}`, x:W/2+20, y:14, col:'#f2c14e', t0:pn, dur:.9, sc:2});
 }
 // La nota (o un silencio, o una nota larga soltada antes) ataca al director: pierde un corazón
 function hurt(why, pn, a){
@@ -165,7 +205,8 @@ function gameStart(){
   if(S.mode!=='practice' && S.mode!=='play'){ run=null; return; }
   const demo=S.mode==='play', off=demo?0:S.off, byI=new Map(S.notes.map(n=>[n.i,n]));
   const evs=score.flat.map(e=>{ const kind=kindOf(e); return {e, kind, rel:e.abs*S.spt+off, n:byI.get(e.i)||null, head:!e.rest&&!e.tie, gk:kind==='tresillo'?e.m+':'+e.cell:null, hit:false, missed:false, actor:null}; });
-  run={demo, live:true, hearts:HEARTS, combo:0, maxCombo:0, pts:0, evs, ptr:0, groups:new Map(), hits:0, nHeads:evs.filter(x=>x.head).length, lost:false};
+  const D=diff();
+  run={demo, live:true, hearts:D.hearts, max:D.hearts, extraHurts:D.extraHurts, vary:0, combo:0, maxCombo:0, pts:0, evs, ptr:0, groups:new Map(), hits:0, nHeads:evs.filter(x=>x.head).length, lost:false};
   actors=[]; parts=[]; texts=[]; banner=null; dir={a:'idle',t0:0};
   if(curtainAt(now())>0) setCurtain(0,.6);
   hud(); cap('', demo?'Escucha: el director afina cada nota':'Toca en cada nota');
@@ -176,7 +217,12 @@ function gameStop(){ if(run) run.live=false; wake(); }
 function gameTap(n, cls){
   if(!run || !run.live || run.demo) return;
   const pn=now();
-  if(!n){ const gh=actors.find(a=>a.st==='ghost'); hurt('extra', pn, gh||null); return; }
+  if(!n){ const gh=actors.find(a=>a.st==='ghost');
+    if(run.extraHurts){ hurt('extra', pn, gh||null); return; }
+    // fácil: el golpe de más solo corta el combo (y resta en la precisión); el fantasma se ríe igual
+    if(gh) gh.laugh=pn; run.combo=0;
+    texts.push({s:'¡UY!', x:DX+24, y:22, col:'#f4f1ea', t0:pn, dur:.6, sc:2});
+    cap(null, 'De más · sin perder corazón'); hud(); wake(); return; }
   const x=run.evs.find(v=>v.n===n);
   if(!x || x.hit || x.missed) return;   // ya dada por no tocada (el toque llegó tarde al manejador): no cuenta dos veces
   x.hit=true; run.hits++;
@@ -224,18 +270,21 @@ function stats(list){ $('#gResStats').innerHTML=list.map(([k,v])=>`<li>${esc(k)}
 // showResults(): la escena acabó sin perder los corazones. Guarda el avance (prog.scenes) y pinta el bloque de arriba
 function gameAfter(pct){
   const res=$('#results'); res.classList.remove('lost');
+  // se llegó al final con vida: la escena queda superada (clear) y se abre la siguiente, con estrellas o sin ellas
   const s=scene(), prev=sceneSt(sceneIdx), stars=starsOf(s,pct), wasLocked=sceneIdx<SCENES.length-1 && !openAt(sceneIdx+1), pts=run?run.pts:0;
-  prog.scenes[s.id]={best:Math.max(prev.best,pct), stars:Math.max(prev.stars,stars), tries:prev.tries+1, pts:Math.max(prev.pts,pts)};
+  const hearts=run?run.hearts:diff().hearts, maxH=run?run.max:diff().hearts;
+  prog.scenes[s.id]={best:Math.max(prev.best,pct), stars:Math.max(prev.stars,stars), tries:prev.tries+1, pts:Math.max(prev.pts,pts), clear:1};
   commitProg(); refreshScene();
-  $('#gResHead').textContent = stars ? '¡Escena superada!' : 'Escena completada';
+  $('#gResHead').textContent = '¡Escena superada!';
   $('#gResStars').hidden=false; $('#gResStars').innerHTML=starStr(stars); $('#gResStars').setAttribute('aria-label',starsTxt(stars));
   const last=sceneIdx===SCENES.length-1;
-  $('#gResText').textContent = stars
-    ? (last ? '¡Has completado la gira de conciertos!' : wasLocked ? 'Se abre la siguiente escena.' : 'La orquesta suena afinada.') + (stars<3 ? ` Para ${stars===1?'dos':'tres'} estrellas necesitas ${stars===1?s.s2:s.s3}% de precisión.` : ' Tres estrellas: ¡ovación!')
-    : `Llegaste al final con ${run?run.hearts:HEARTS} ${run&&run.hearts===1?'corazón':'corazones'}, pero te faltan ${s.goal-pct} puntos de precisión para la primera estrella (objetivo ${s.goal}%).`;
-  stats([['Precisión',pct+'%'],['Puntos',fmtN(pts)+(pts>prev.pts&&prev.pts?' (récord)':'')],['Combo máximo','×'+(run?run.maxCombo:0)],['Corazones',`${run?run.hearts:HEARTS} de ${HEARTS}`]]);
-  $('#gNext').hidden=!nextOK(); $('#gNext').classList.toggle('primary',stars>0); $('#gRetry').classList.toggle('primary',!stars);
-  banner={s:stars?'¡BRAVO!':'FIN', t0:now()}; wake();
+  const lead = last ? '¡Has completado la gira de conciertos!' : wasLocked ? 'Se abre la siguiente escena.' : stars ? 'La orquesta suena afinada.' : 'Llegaste al final con vida.';
+  $('#gResText').textContent = lead + (stars===3 ? ' Tres estrellas: ¡ovación!'
+    : stars ? ` Para ${stars===1?'dos':'tres'} estrellas necesitas ${stars===1?s.s2:s.s3}% de precisión.`
+    : ` Para la primera estrella te faltan ${s.goal-pct} puntos de precisión (objetivo ${s.goal}%).`);
+  stats([['Precisión',pct+'%'],['Puntos',fmtN(pts)+(pts>prev.pts&&prev.pts?' (récord)':'')],['Combo máximo','×'+(run?run.maxCombo:0)],['Corazones',`${hearts} de ${maxH}`],['Dificultad',diff().name]]);
+  $('#gNext').hidden=!nextOK(); $('#gNext').classList.add('primary'); $('#gRetry').classList.remove('primary');
+  banner={s:stars?'¡BRAVO!':'¡SUPERADA!', t0:now()}; wake();
 }
 // alto que tapa el escenario, que queda fijo abajo (sticky): followScore deja la línea actual y la siguiente por encima
 const stageReserve=()=>{ const s=$('#gStage'); return $('#sceneView').hidden ? 0 : s.offsetHeight+8; };
@@ -280,7 +329,7 @@ function update(pn){
       case 'stand': if(pn>a.end+(live?1:0.3)){ a.st='leave'; a.t1=pn; } break;   // sin resolver (pasada detenida): se va
       case 'hit': if(pn>=a.t1+0.12) die(a,pn); break;
       case 'held': if(pn>=a.end) die(a,pn); break;
-      case 'dying': if(pn>=a.t1+0.35) a.gone=true; break;
+      case 'dying': if(pn>=a.t1+(a.dd||0.35)) a.gone=true; break;
       case 'attack': if(pn>=a.t1+0.2){ const more=a.heads>1 && a.done+(a.missed||0)<a.heads && !a.countered; if(more){ a.st='stand'; } else { a.st='leave'; a.t1=pn; } } break;
       case 'leave': if(pn>=a.t1+0.7) a.gone=true; break;
       case 'calm': if(pn>=a.end){ a.st='leave'; a.t1=pn; } break;
@@ -303,6 +352,10 @@ function pos(a, pn){
   if(pe<1){ x+=Math.round((1-pe)*52); y-=reduce()?0:Math.round(14*4*pe*(1-pe)); }
   if(a.st==='attack'){ const p=Math.min(1,(pn-a.t1)/0.2); x=Math.round(a.x-(a.x-74)*Math.sin(Math.PI*p)); }
   else if(a.st==='leave'){ const p=(pn-a.t1)/0.7; x=Math.round(a.x+p*160); y-=reduce()?0:Math.abs(Math.round(Math.sin(p*18)*2)); }
+  else if(a.st==='hit' && !reduce()){ const d=pn-a.t1;
+    if(a.death==='shatter') x+=Math.floor(pn*70)%2?1:-1;            // tiembla con el trémolo
+    else if(a.death==='split') x+=Math.round(3*Math.min(1,d/0.06));  // retrocede con el tajo
+    else if(d<0.06) y+=1; }
   else if(a.st==='hit' && pn-a.t1<0.06) y+=1;
   return [x,y];
 }
@@ -315,26 +368,47 @@ function drawSpr(key, x, y, sc, o={}){
 }
 // línea de píxeles (batuta, rayos, cortes)
 function pline(x0,y0,x1,y1,col,th=1,every=1){ g.fillStyle=col; const n=Math.max(Math.abs(x1-x0),Math.abs(y1-y0))|0; for(let i=0;i<=n;i+=every){ const p=n?i/n:0; g.fillRect(Math.round(x0+(x1-x0)*p),Math.round(y0+(y1-y0)*p),th,th); } }
+// Batutazo: por arriba (de −105° a 30°) o de abajo arriba (de 70° a −80°); tajo: de ida (arriba → abajo) o de vuelta
+const SWING={batuta:[[-105,30],[70,-80]], corte:[[-80,25],[40,-70]]};
+// Movimiento del cuerpo del director en cada golpe [dx, dy]: salto (batutazo), estocada (tajo), temblor (trémolo), brinco (giro), echarse atrás (sostenida)
+function dirBody(pn){
+  if(dir.a!=='strike' || reduce()) return [0,0];
+  const d=pn-dir.t0;
+  switch(dir.fx){
+    case 'batuta': return [Math.round(3*Math.sin(Math.PI*Math.min(1,d/0.16))), -Math.round(5*Math.sin(Math.PI*Math.min(1,d/0.14)))];
+    case 'corte': return [Math.round(8*(d<0.05 ? d/0.05 : Math.max(0,1-(d-0.05)/0.15))), 0];
+    case 'tremolo': return [d<0.24 ? (Math.floor(d*50)%2?1:-1) : 0, 0];
+    case 'giro': return [0, -Math.round(3*Math.abs(Math.sin(Math.PI*Math.min(1,d/0.22)*2)))];
+    case 'sost': return [-2, dir.tgt && dir.tgt.st==='held' ? -Math.round(Math.abs(Math.sin(pn*4))) : 0];
+  }
+  return [0,0];
+}
+// destello en cruz de radio k y corchea de 4×5 píxeles (partículas y efectos)
+function pstar(x,y,k,col){ g.fillStyle=col; g.fillRect(x-k,y,2*k+1,1); g.fillRect(x,y-k,1,2*k+1); g.fillRect(x-1,y-1,3,3); }
+const NOTE_PX=['..##','..#.','..#.','###.','##..'];
+function pnote(x,y,col){ g.fillStyle=col; NOTE_PX.forEach((r,ry)=>{ for(let i=0;i<4;i++) if(r[i]==='#') g.fillRect(x+i,y+ry,1,1); }); }
 function batonAngle(pn){
   const d=pn-dir.t0, deg=Math.PI/180;
   if(dir.a==='hurt') return -125*deg;
   if(dir.a!=='strike') return -55*deg;
+  const [a0,a1]=SWING[dir.fx]?.[dir.v||0] || [-105,30];
   switch(dir.fx){
-    case 'batuta': return (d<0.06 ? lerp(-55,-105,d/0.06) : d<0.14 ? lerp(-105,30,(d-0.06)/0.08) : lerp(30,-55,(d-0.14)/0.1))*deg;
-    case 'corte': return (d<0.05 ? lerp(-55,-15,d/0.05) : lerp(-15,-55,(d-0.05)/0.15))*deg;
+    case 'batuta': case 'corte': {   // se arma (a0), descarga (a1) y vuelve al reposo; el tajo es más corto y seco
+      const t1=dir.fx==='corte'?0.04:0.06, t2=t1+(dir.fx==='corte'?0.05:0.08);
+      return (d<t1 ? lerp(-55,a0,d/t1) : d<t2 ? lerp(a0,a1,(d-t1)/(t2-t1)) : lerp(a1,-55,(d-t2)/0.1))*deg; }
     case 'tremolo': return (-30+(reduce()?0:16*Math.sin(d*70)))*deg;
-    case 'giro': return (-55+360*Math.min(1,d/0.22))*deg;
+    case 'giro': return (-55+(dir.v?-360:360)*Math.min(1,d/0.22))*deg;
     case 'sost': { const c=center(dir.tgt,pn); return Math.atan2(c[1]-HAND[1], c[0]-HAND[0]); }
   }
   return -55*deg;
 }
 function drawDirector(pn){
-  const hurtP=dir.a==='hurt' ? pn-dir.t0 : -1, rm=reduce();
-  const x=DX-(hurtP>=0 && !rm ? Math.round(3*Math.max(0,1-hurtP/0.3)) : 0);
+  const hurtP=dir.a==='hurt' ? pn-dir.t0 : -1, rm=reduce(), [bx,by]=dirBody(pn);
+  const x=DX+bx-(hurtP>=0 && !rm ? Math.round(3*Math.max(0,1-hurtP/0.3)) : 0), y=DY+by;
   // herida: con movimiento reducido, tinte rojo fijo; si no, parpadeo rojo y blanco
   const over = hurtP<0 ? null : rm ? ['r',.5] : [Math.floor(hurtP/0.06)%2?'f':'r', .7];
-  drawSpr('o_heroe', x, DY, 3, {over});
-  const a=batonAngle(pn), hx=HAND[0]-(DX-x), hy=HAND[1], L=17, tx=Math.round(hx+Math.cos(a)*L), ty=Math.round(hy+Math.sin(a)*L);
+  drawSpr('o_heroe', x, y, 3, {over});
+  const a=batonAngle(pn), hx=HAND[0]-(DX-x), hy=HAND[1]-(DY-y), L=17, tx=Math.round(hx+Math.cos(a)*L), ty=Math.round(hy+Math.sin(a)*L);
   pline(hx,hy,tx,ty,'#f4f1ea',2); g.fillStyle='#f2c14e'; g.fillRect(tx-1,ty-1,3,3);
   if(dir.a==='strike') drawFx(pn, hx, hy, tx, ty, a);
 }
@@ -342,11 +416,25 @@ function drawDirector(pn){
 function drawFx(pn, hx, hy, tx, ty, ang){
   const d=pn-dir.t0, t=dir.tgt, c=center(t,pn), rm=reduce();
   switch(dir.fx){
-    case 'batuta': if(d>0.05 && d<0.22){ g.fillStyle='#f2c14e'; for(let k=-105;k<=Math.min(30,ang*180/Math.PI);k+=7){ const r=k*Math.PI/180; g.fillRect(Math.round(hx+Math.cos(r)*20),Math.round(hy+Math.sin(r)*20),2,2); } } break;
-    case 'corte': if(d<0.16){ const p=Math.min(1,d/0.08); pline(c[0]-12, c[1]-4, Math.round(c[0]-12+28*p), c[1]+4, '#ffffff', 1); } break;
-    case 'tremolo': if(d<0.24) for(let k=0;k<3;k++){ const y=c[1]-14-k*4, s=rm?0:(Math.floor(d*40)+k)%2; pline(c[0]-6,y+s,c[0]-2,y-2+s,'#f4f1ea'); pline(c[0]-2,y-2+s,c[0]+2,y+s,'#f4f1ea'); pline(c[0]+2,y+s,c[0]+6,y-2+s,'#f4f1ea'); } break;
-    case 'giro': if(d<0.3){ g.fillStyle='#f2c14e'; for(let k=0;k<360;k+=30){ const r=(k+d*900)*Math.PI/180; g.fillRect(Math.round(tx+Math.cos(r)*6),Math.round(ty+Math.sin(r)*6),1,1); } } break;
+    case 'batuta': {   // estela dorada del arco y, al llegar, un golpe en la cabeza de la nota
+      const [a0,a1]=SWING.batuta[dir.v||0], cur=ang*180/Math.PI, lo=Math.min(a0,cur), hi=Math.max(a0,cur);
+      if(d>0.05 && d<0.24){ g.fillStyle='#f2c14e'; for(let k=lo;k<=hi;k+=6){ const r=k*Math.PI/180; g.fillRect(Math.round(hx+Math.cos(r)*20),Math.round(hy+Math.sin(r)*20),2,2); } }
+      if(d>0.12 && d<0.26){ const k=Math.round(lerp(2,6,(d-0.12)/0.14)); pstar(c[0], c[1]-6, k, '#ffffff'); }
+      if(a1<a0 && d>0.12 && d<0.22) for(let i=0;i<3;i++) pline(c[0]-6+i*6, c[1]+12, c[0]-6+i*6, c[1]+6-i%2*2, '#f4f1ea');   // de abajo arriba: rayas de impulso
+      break; }
+    case 'corte': if(d<0.18){   // tajo diagonal que cruza la nota (de ida o de vuelta), con estela gris
+      const p=Math.min(1,d/0.07), sgn=dir.v?-1:1, x0=c[0]-18, y0=c[1]-8*sgn, x1=Math.round(x0+36*p), y1=Math.round(y0+16*sgn*p);
+      pline(x0,y0+sgn,x1,y1+sgn,'#cfc9d8',1); pline(x0,y0,x1,y1,'#ffffff',2); } break;
+    case 'tremolo': if(d<0.26){   // rayo en zigzag de la punta de la batuta a la nota (cambia en cada fotograma)
+      let px=tx, py=ty; const seg=5;
+      for(let i=1;i<=seg;i++){ const k=i/seg, j=i===seg?0:(rm?(i%2?3:-3):Math.round(rnd(-4,4)));
+        const nx=Math.round(lerp(tx,c[0],k)), ny=Math.round(lerp(ty,c[1],k))+j; pline(px,py,nx,ny,i%2?'#ffffff':'#a8d8ff',1); px=nx; py=ny; }
+      if(!rm && Math.floor(d*30)%2) pstar(c[0], c[1], 4, '#a8d8ff'); } break;
+    case 'giro': if(d<0.3){   // tres notas doradas giran alrededor de la punta y vuelan hacia el trío
+      const p=Math.min(1,d/0.3), ox=lerp(tx,c[0],p), oy=lerp(ty,c[1]-6,p), r=6+p*4;
+      for(let k=0;k<3;k++){ const an=(dir.v?-1:1)*d*24+k*2.094; pnote(Math.round(ox+Math.cos(an)*r)-2, Math.round(oy+Math.sin(an)*r)-3, '#f2c14e'); } } break;
     case 'sost': if(t.st==='held'){ const on=rm || Math.floor(pn*12)%2; pline(tx,ty,c[0],c[1],on?'#f2c14e':'#c8902a',1,2);
+        if(!rm) for(let k=0;k<3;k++){ const q=(pn*1.6+k/3)%1; g.fillStyle='#fff3c4'; g.fillRect(Math.round(lerp(tx,c[0],q))-1, Math.round(lerp(ty,c[1],q))-1, 3, 3); }   // pulsos que viajan por el rayo
         if(t.kind==='redonda'){ const p=pos(t,pn), cx=p[0]+8*t.s, top=p[1]+2*t.s; g.fillStyle='#f2c14e';   // calderón sobre la Redonda
           for(let k=0;k<=180;k+=12){ const r=k*Math.PI/180; g.fillRect(Math.round(cx-Math.cos(r)*8),Math.round(top-Math.sin(r)*7),2,1); } g.fillRect(cx-1,top-2,2,2); } }
       break;
@@ -355,8 +443,9 @@ function drawFx(pn, hx, hy, tx, ty, ang){
 function drawActor(a, pn){
   const [x,y]=pos(a,pn);
   if(a.st==='ghost'){ const lg=pn-a.laugh<0.35; drawSpr(a.key,x,y,a.s,{rim:false, mode:'g', alpha:.6, over: lg ? ['r', reduce()?.5:(Math.floor(pn*16)%2?.8:.3)] : null}); return; }
+  if(a.st==='dying' && !reduce()){ drawDying(a,x,y,pn); return; }
   let alpha=1, over=null;
-  if(a.st==='dying') alpha=1-(pn-a.t1)/0.35;
+  if(a.st==='dying') alpha=1-(pn-a.t1)/(a.dd||0.35);
   if(a.calm) alpha=.75;
   if(!reduce() && (a.st==='hit' && pn-a.t1<0.08 || pn-a.flash<0.08)) over=['f',.8];
   if(a.st==='held') over=['f',reduce()?.25:.15+.1*Math.sin(pn*10)];
@@ -364,11 +453,41 @@ function drawActor(a, pn){
   if(a.calm && a.st!=='leave'){ g.fillStyle='#f4f1ea'; for(let k=0;k<=180;k+=15){ const r=k*Math.PI/180; g.fillRect(Math.round(x+8*a.s-Math.cos(r)*12), Math.round(y+a.s-Math.sin(r)*4),2,1); } }   // ligadura sobre la nota ligada
   if(a.kind==='tresillo' && a.done && a.st!=='dying'){ g.fillStyle='#f2c14e'; for(let k=0;k<a.done;k++) g.fillRect(x+[3,8,13][k]*a.s-1, y+15*a.s, 3, 2); }   // notas del trío ya afinadas
 }
+// Cómo cae cada enemigo afinado (sin movimiento reducido): aplastado, partido en dos, girando o subiendo; el que estalla ya es partículas
+function drawSprPart(key, sx, sy, sw, sh, dx, dy, dw, dh, alpha){
+  g.globalAlpha=alpha*0.9; const r=sprite(key,'w'); for(const [ox,oy] of [[-1,0],[1,0],[0,-1],[0,1]]) g.drawImage(r,sx,sy,sw,sh,dx+ox,dy+oy,dw,dh);
+  g.globalAlpha=alpha; g.drawImage(sprite(key,''),sx,sy,sw,sh,dx,dy,dw,dh); g.globalAlpha=1;
+}
+function drawDying(a, x, y, pn){
+  const p=Math.max(0,Math.min(1,(pn-a.t1)/a.dd)), s=a.s, w=16*s, fade=p>0.6?(1-p)/0.4:1;
+  switch(a.death){
+    case 'squash': {   // se aplasta contra las tablas y se ensancha
+      const f=foot(a.key), sy=Math.max(0.12,1-p*2.2), sx=1+(1-sy)*0.7, ww=Math.round(w*sx), hh=Math.max(2,Math.round(f*s*sy));
+      drawSprPart(a.key,0,0,16,f, Math.round(x+w/2-ww/2), y+f*s-hh, ww, hh, fade); break; }
+    case 'split': {    // dos mitades que se separan y caen (la de arriba según el sentido del tajo)
+      const d=Math.round(p*16), up=a.v?1:-1, x0=x+3;
+      drawSprPart(a.key,0,0,8,16, x0-d, Math.round(y+(up<0?-8*p:0)+30*p*p), 8*s, w, fade);
+      drawSprPart(a.key,8,0,8,16, x0+8*s+d, Math.round(y+(up>0?-8*p:0)+30*p*p), 8*s, w, fade); break; }
+    case 'spin': {     // gira y encoge mientras sube
+      g.save(); g.translate(Math.round(x+w/2), Math.round(y+w/2-22*p)); g.rotate((a.v?-1:1)*p*Math.PI*3); const k=1-p*0.75; g.scale(k,k);
+      drawSprPart(a.key,0,0,16,16,-w/2,-w/2,w,w,fade); g.restore(); break; }
+    case 'ascend':     // sube flotando, cada vez más clara
+      drawSpr(a.key, x, Math.round(y-34*p*p), s, {alpha:1-p, over:['f',0.3+0.5*p]}); break;
+  }
+}
 function drawCurtain(c){
   if(c<=0.01) return;
   const w=Math.round(23+(W/2-23)*c);
   [[0,w],[W-w,w]].forEach(([x0,ww])=>{ g.fillStyle='#8e2222'; g.fillRect(x0,0,ww,H); g.fillStyle='#6e1818'; for(let i=x0+5;i<x0+ww-2;i+=9) g.fillRect(i,0,2,H); g.fillStyle='#a52a2a'; g.fillRect(x0,H-4,ww,4); });
   g.fillStyle='#a52a2a'; g.fillRect(0,0,W,8);
+}
+function drawPart(p, pn){
+  const d=Math.max(0,pn-p.t0), q=d/p.life; g.globalAlpha=Math.max(0,1-q); g.fillStyle=p.col;
+  if(p.kind==='ring'){ const r=lerp(p.r0,p.r1,q), ry=p.ry||1, n=Math.max(12,Math.round(r*5));
+    for(let i=0;i<n;i++){ const an=i/n*Math.PI*2; g.fillRect(Math.round(p.x+Math.cos(an)*r), Math.round(p.y+Math.sin(an)*r*ry), 1, 1); } return; }
+  if(p.kind==='star'){ pstar(Math.round(p.x), Math.round(p.y), Math.max(1,Math.round(p.r1*Math.min(1,q*2))), p.col); return; }
+  const x=Math.round(p.x+p.vx*d+(p.sway?Math.sin(d*9+p.x)*3:0)), y=Math.round(p.y+p.vy*d+p.gr*d*d);
+  if(p.kind==='note') pnote(x,y,p.col); else g.fillRect(x,y,p.sz,p.sz);
 }
 function draw(pn=now()){
   if(!g) return;
@@ -380,7 +499,7 @@ function draw(pn=now()){
   if(sc.boss && !actors.some(a=>a.big)){ const k=BOSS_SPR[sc.boss]; drawSpr(k, 196, 79-foot(k)*4, 4, {alpha:.45}); g.drawImage(background(),W-23,0,23,H,W-23,0,23,H); }
   drawDirector(pn);
   actors.slice().sort((a,b)=>(a.st==='ghost')-(b.st==='ghost') || b.x-a.x).forEach(a=>drawActor(a,pn));
-  parts.forEach(p=>{ const d=pn-p.t0; g.globalAlpha=Math.max(0,1-d/p.life); g.fillStyle=p.col; g.fillRect(Math.round(p.x+p.vx*d), Math.round(p.y+p.vy*d+40*d*d), 1, 1); }); g.globalAlpha=1;
+  parts.forEach(p=>drawPart(p,pn)); g.globalAlpha=1;
   texts.forEach(t=>{ const p=(pn-t.t0)/t.dur; text(t.s, t.x, Math.round(t.y-(reduce()?0:8*p)), t.col, t.sc, p>0.7?Math.max(0,(1-p)/0.3):1); });
   g.setTransform(PX,0,0,PX,0,0);
   drawCurtain(curtainAt(pn));
@@ -391,10 +510,10 @@ function draw(pn=now()){
 const HEART='M1 0h2v1h1V0h2v1h1v2H6v1H5v1H4v1H3V5H2V4H1V3H0V1h1z';
 let hudLast='';
 function hud(){
-  const h=run?run.hearts:HEARTS, c=run?run.combo:0, p=run?run.pts:0;
-  if(hudLast!==String(h)){ hudLast=String(h);
-    $('#gHearts').innerHTML=Array.from({length:HEARTS},(_,i)=>`<svg viewBox="0 0 7 6" aria-hidden="true"><path class="${i<h?'hf':'he'}" d="${HEART}"/></svg>`).join('');
-    $('#gHearts').setAttribute('aria-label',`${h} de ${HEARTS} corazones`); }
+  const mx=run?run.max:diff().hearts, h=run?run.hearts:mx, c=run?run.combo:0, p=run?run.pts:0;
+  if(hudLast!==h+'/'+mx){ hudLast=h+'/'+mx;
+    $('#gHearts').innerHTML=Array.from({length:mx},(_,i)=>`<svg viewBox="0 0 7 6" aria-hidden="true"><path class="${i<h?'hf':'he'}" d="${HEART}"/></svg>`).join('');
+    $('#gHearts').setAttribute('aria-label',`${h} de ${mx} corazones`); }
   $('#gCombo').textContent = c>=2 ? `Combo ×${c}` : '';
   $('#gPts').textContent = `${fmtN(p)} pts`;
 }
@@ -420,5 +539,5 @@ new ResizeObserver(()=>{ if(!$('#sceneView').hidden) draw(); }).observe($('#gSta
 reduceMQ.addEventListener('change',()=>draw());
 
 Object.assign(window, {gameStart, gameStop, gameTap, gameRelease, gameAbandon, gameAfter, stageReserve, stageReset, stageEnter,
-  stageDraw:()=>draw(), renderBest, bossThumb:k=>thumb(BOSS_SPR[k]), gameRun:()=>run});
+  stageDraw:()=>draw(), stageHud:()=>{ if(run && run.live) return; const r=run; run=null; hud(); run=r; }, renderBest, bossThumb:k=>thumb(BOSS_SPR[k]), gameRun:()=>run});
 })();

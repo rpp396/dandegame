@@ -87,9 +87,18 @@ const restList = C => C.rests || [];
 /* ---------- Ajustes ---------- */
 // hold: modo piano (se mide también cuándo se suelta); metro: metrónomo durante la escena (la cuenta previa suena siempre);
 // rhythmVol: volumen de «Escuchar»; tapSound/tapVol: oír mis toques; fab: botón flotante en pantallas táctiles;
-// offset: corrección de latencia (ms, + si se llega tarde); gameId: escena abierta; view: pantalla ('mapa' o 'escena')
+// offset: corrección de latencia (ms, + si se llega tarde); diff: dificultad (ver DIFFS); gameId: escena abierta; view: pantalla ('mapa' o 'escena')
 const DEFAULTS = {hold:true, metro:true, metroVol:0.7, rhythmVol:0.6, tapSound:true, tapVol:0.6, fab:true, vibrate:true,
-  offset:0, seen:false, gameId:'', view:'mapa'};
+  offset:0, diff:'normal', seen:false, gameId:'', view:'mapa'};
+// Dificultad: corazones de la pasada, tempo (factor sobre el de la escena) y si un golpe de más quita corazón.
+// Las estrellas piden la misma precisión en las tres; terminar la escena con vida abre la siguiente en cualquiera.
+const DIFFS = {
+  facil:  {name:'Fácil',   hearts:8, tempo:0.8,  extraHurts:false, long:'8 corazones, el tempo al 80 % y los golpes de más no quitan corazón'},
+  normal: {name:'Normal',  hearts:5, tempo:1,    extraHurts:true,  short:'5 corazones', long:'5 corazones y el tempo de la escena'},
+  dificil:{name:'Difícil', hearts:3, tempo:1.15, extraHurts:true,  short:'3 corazones, más rápido', long:'3 corazones y el tempo un 15 % más rápido'},
+};
+const DIFF_IDS = Object.keys(DIFFS);
+const diff = () => DIFFS[oneOf(set.diff, DIFF_IDS, 'normal')];
 
 /* ---------- Validación de lo guardado ---------- */
 // Todo lo que se lee de localStorage se trata como no fiable: se copian solo campos conocidos, con su tipo y rango,
@@ -107,6 +116,7 @@ function cleanSettings(o){
   ['hold','metro','tapSound','fab','vibrate','seen'].forEach(k=>{ s[k]=typeof o[k]==='boolean' ? o[k] : D[k]; });
   s.gameId = strIn(o.gameId,/^G\d{1,3}$/,'');
   s.view = oneOf(o.view,['mapa','escena'],D.view);
+  s.diff = oneOf(o.diff,DIFF_IDS,D.diff);
   return s;
 }
 function load(){
@@ -135,7 +145,7 @@ const fineMQ = matchMedia('(any-pointer: fine)');
 const kbOn = () => fineMQ.matches;
 // Repintar con innerHTML sin perder el foco de teclado: recuerda qué control de box lo tenía (por su data-… o su id) y, tras fn(),
 // enfoca el equivalente (si ya no se puede, el primer botón activo)
-const FOCUS_KEYS = ['data-lv','data-hold','id'];
+const FOCUS_KEYS = ['data-lv','data-hold','data-diff','id'];
 function keepFocus(box, fn){
   const a=document.activeElement; let sel=null;
   if(a && a!==box && box.contains(a)){ const at=FOCUS_KEYS.find(k=>a.hasAttribute(k)); if(at) sel=`[${at}="${CSS.escape(a.getAttribute(at))}"]`; }

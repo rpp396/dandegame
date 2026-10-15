@@ -1,6 +1,6 @@
 # Orquesta desafinada
 
-Un juego web de lectura rítmica en pixel art. La orquesta se ha desafinado: cada nota de la partitura sube al escenario justo en su tiempo y, si la tocas a tiempo, el director la afina con su batuta. Cinco corazones, combos y puntos, en una gira de 20 escenas que va de las negras en el pulso a las síncopas, los tresillos y los compases compuestos.
+Un juego web de lectura rítmica en pixel art. La orquesta se ha desafinado: cada nota de la partitura sube al escenario justo en su tiempo y, si la tocas a tiempo, el director la afina con su batuta. Corazones (según la dificultad), combos y puntos, en una gira de 20 escenas que va de las negras en el pulso a las síncopas, los tresillos y los compases compuestos.
 
 Se juega con el dedo, el ratón o el teclado (la barra espaciadora), en el móvil o en el ordenador. Está en español.
 
@@ -10,9 +10,11 @@ Se juega con el dedo, el ratón o el teclado (la barra espaciadora), en el móvi
 
 1. Elige una escena en el mapa de la **gira de conciertos**. Pulsa **Escuchar**: el director toca el ritmo de la partitura para que lo oigas.
 2. Pulsa **Empezar la escena** (o toca la partitura). Tras un compás de cuenta, toca en cada nota: sobre la partitura o el escenario, con el botón grande de abajo en el móvil o con la barra espaciadora.
-3. Cada nota sube al escenario en su tiempo. Si aciertas, el director la afina (cada figura tiene su golpe: batutazo, corte, trémolo, giro, nota sostenida…) y sumas puntos: exacto 100, bien 80, por el **combo** (×2 desde 5 aciertos seguidos, ×3 desde 10, ×4 desde 15); cerca 50, y corta el combo.
-4. Pierdes un **corazón** con cada nota sin tocar y cada golpe de más (también si golpeas un silencio: son fantasmas que cruzan el escenario). Sin los cinco corazones, cae el **telón**.
-5. Al acabar, la **precisión** decide las estrellas: una con el objetivo de la escena (70–75 %), dos con 12 puntos más (máx. 90 %) y tres con 95 %. Con una estrella se abre la escena siguiente.
+3. Cada nota sube al escenario en su tiempo. Si aciertas, el director la afina (cada figura tiene su golpe y su forma de caer: la negra, aplastada de un batutazo; la corchea, partida en dos de un tajo; la semicorchea, estallada por un rayo; el tresillo sale girando; la blanca y la redonda suben convertidas en notas) y sumas puntos: exacto 100, bien 80, por el **combo** (×2 desde 5 aciertos seguidos, ×3 desde 10, ×4 desde 15); cerca 50, y corta el combo.
+4. Pierdes un **corazón** con cada nota sin tocar y cada golpe de más (también si golpeas un silencio: son fantasmas que cruzan el escenario). Sin corazones, cae el **telón**.
+5. Al acabar, la **precisión** decide las estrellas: una con el objetivo de la escena (70–75 %), dos con 12 puntos más (máx. 90 %) y tres con 95 %. Basta con llegar al final con algún corazón para superar la escena y abrir la siguiente.
+
+**Dificultad:** **Fácil** (8 corazones, el tempo al 80 % y los golpes de más no quitan corazón), **Normal** (5 corazones) o **Difícil** (3 corazones y el tempo un 15 % más rápido). Se elige en la escena o en *Ajustes*; las estrellas piden la misma precisión en las tres.
 
 **Forma de tocar:** en **Piano** (la de por defecto) mantienes pulsada cada nota lo que dura y también se mide cuándo la sueltas; soltar antes de tiempo una blanca o una redonda hace que contraataque. En **Batería** solo cuenta el golpe, que suena como un redoblante. Se elige en la escena o en *Ajustes*.
 
@@ -68,7 +70,7 @@ npx playwright install chromium
 npm test            # o: node tests/run.js [filtro]
 ```
 
-- `juego.test.js`: mapa, cobertura de figuras de las 20 escenas, aciertos, combo, corazones (nota sin tocar, golpe de más en un silencio, blanca soltada antes en piano), telón, victoria y desbloqueo, Esc, *Escuchar*, recarga y validación del avance.
+- `juego.test.js`: mapa, cobertura de figuras de las 20 escenas, aciertos, combo, corazones (nota sin tocar, golpe de más en un silencio, blanca soltada antes en piano), telón, victoria y desbloqueo (también sin estrella), dificultad, Esc, *Escuchar*, recarga y validación del avance.
 - `tiempo.test.js`: alineación de toques, evaluación a 240 ppm, piano, cuenta previa, hora del toque, volumen en vivo, planificador, metrónomo y latencia.
 - `seguridad.test.js`: CSP, datos guardados maliciosos o corruptos, almacenamiento lleno y recorrido completo (también con `file://`) sin violaciones ni peticiones externas.
 - `a11y.test.js`: contraste calculado desde `styles.css`, estructura, nombres accesibles, foco, diálogo de ajustes, *Reiniciar* con teclado, formas de los marcadores, movimiento reducido y colores forzados.

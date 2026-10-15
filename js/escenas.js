@@ -38,12 +38,15 @@ let view='mapa';   // pantalla visible: 'mapa' (la gira) o 'escena'
 const scene=()=>SCENES[sceneIdx];
 // Configuración activa (la usan la generación y el transporte): la escena abierta
 function cfg(){ return scene(); }
-function curBpm(){ return scene().bpm; }
+// ppm de la pasada: el tempo de la escena por el factor de la dificultad
+function curBpm(){ return Math.round(scene().bpm*diff().tempo); }
 // Avance guardado (prog.scenes, validado por cleanScenes en progreso.js): siempre números
-function sceneSt(i){ const v=prog.scenes[SCENES[i].id]||{}; return {best:+v.best||0, stars:+v.stars||0, tries:+v.tries||0, pts:+v.pts||0}; }
-// Abierta: la primera, la que sigue a una con estrella y la que ya se superó o se intentó (aunque se inserten escenas antes)
-const openAt=i=>i===0 || sceneSt(i-1).stars>0 || sceneSt(i).stars>0 || sceneSt(i).tries>0;
-function firstOpen(){ for(let i=0;i<SCENES.length;i++) if(!sceneSt(i).stars) return i; return SCENES.length-1; }
+function sceneSt(i){ const v=prog.scenes[SCENES[i].id]||{}; return {best:+v.best||0, stars:+v.stars||0, tries:+v.tries||0, pts:+v.pts||0, clear:v.clear?1:0}; }
+// Superada: terminada con vida (clear) o con alguna estrella (avance de antes de clear)
+const passedAt=i=>{ const v=sceneSt(i); return v.stars>0 || !!v.clear; };
+// Abierta: la primera, la que sigue a una superada y la que ya se superó o se intentó (aunque se inserten escenas antes)
+const openAt=i=>i===0 || passedAt(i-1) || passedAt(i) || sceneSt(i).tries>0;
+function firstOpen(){ for(let i=0;i<SCENES.length;i++) if(!passedAt(i)) return i; return SCENES.length-1; }
 const starsOf=(s,p)=>p>=s.s3?3:p>=s.s2?2:p>=s.goal?1:0;
 const sceneName=s=>`${s.act+1}-${s.n} ${s.title}`;
 const nextOK=()=>sceneIdx<SCENES.length-1 && openAt(sceneIdx+1);
@@ -72,7 +75,8 @@ function renderBar(){
   const s=scene(), v=sceneSt(sceneIdx), SG=SIGS[s.sig];
   $('#lvEyebrow').innerHTML=`<span class="lv-ch">${esc(ACTS[s.act])} — </span>Acto ${s.act+1} · Escena ${s.n} de 4${s.boss?' · Jefa':''}`;
   $('#lvTitle').textContent=s.title; $('#lvDesc').textContent=s.desc;
-  $('#lvMeta').innerHTML=`<span>${s.sig}</span><span>${s.bars} compases</span><span>${tempoLabel(s.bpm,SG)} · ${tempoMark(s.bpm)}</span><span>Objetivo ${s.goal}%</span><span><span aria-hidden="true">★★</span><span class="sr-only">Dos estrellas: </span>${s.s2}%</span><span><span aria-hidden="true">★★★</span><span class="sr-only">Tres estrellas: </span>${s.s3}%</span>${v.best?`<span>Mejor: ${esc(v.best)}%</span>`:''}${v.pts?`<span>Récord: ${esc(fmtN(v.pts))} pts</span>`:''}`;
+  const b=curBpm(), D=diff();
+  $('#lvMeta').innerHTML=`<span>${s.sig}</span><span>${s.bars} compases</span><span>${tempoLabel(b,SG)} · ${tempoMark(b)}</span><span>${esc(D.name)}: ${D.hearts} <span aria-hidden="true">♥</span><span class="sr-only">corazones</span></span><span>Objetivo ${s.goal}%</span><span><span aria-hidden="true">★★</span><span class="sr-only">Dos estrellas: </span>${s.s2}%</span><span><span aria-hidden="true">★★★</span><span class="sr-only">Tres estrellas: </span>${s.s3}%</span>${v.best?`<span>Mejor: ${esc(v.best)}%</span>`:''}${v.pts?`<span>Récord: ${esc(fmtN(v.pts))} pts</span>`:''}`;
   $('#lvStars').innerHTML=starStr(v.stars); $('#lvStars').setAttribute('aria-label',starsTxt(v.stars));
   const a=document.activeElement;
   $('#lvPrev').disabled=sceneIdx===0; $('#lvNext').disabled=!nextOK();
@@ -80,7 +84,7 @@ function renderBar(){
   if(a && a.disabled && (a.id==='lvPrev'||a.id==='lvNext')) $(a.id==='lvPrev'?'#lvNext':'#lvPrev').focus({preventScroll:true});
 }
 function renderMap(){
-  let passed=0, stars=0, pts=0; SCENES.forEach((s,i)=>{ const v=sceneSt(i); if(v.stars) passed++; stars+=v.stars; pts+=v.pts; });
+  let passed=0, stars=0, pts=0; SCENES.forEach((s,i)=>{ const v=sceneSt(i); if(passedAt(i)) passed++; stars+=v.stars; pts+=v.pts; });
   $('#gTotal').innerHTML=`<b>${esc(passed)}</b> de ${SCENES.length} escenas superadas · <b>${esc(stars)}</b> de ${SCENES.length*3} ${STAR_SR}${pts?` · <b>${esc(fmtN(pts))}</b> puntos`:''}`;
   const nx=firstOpen(), ns=SCENES[nx], played=SCENES.some((s,i)=>sceneSt(i).tries);
   $('#bContinueLbl').textContent=`${played?'Continuar':'Empezar la gira'}: ${sceneName(ns)}`;
@@ -89,9 +93,9 @@ function renderMap(){
   keepFocus($('#gMap'),()=>{ $('#gMap').innerHTML=ACTS.map((ac,ai)=>{
     let st=0; const boss=SCENES.find(s=>s.act===ai && s.boss);
     const btns=SCENES.map((s,i)=>({s,i})).filter(o=>o.s.act===ai).map(({s,i})=>{
-      const v=sceneSt(i), un=openAt(i); st+=v.stars;
-      const nm=`Escena ${s.act+1}-${s.n}: ${s.title}${s.boss?' (jefa)':''}, ${un ? starsTxt(v.stars)+(v.best?`, mejor ${v.best}%, ${fmtN(v.pts)} puntos`:'')+', '+(v.stars?'superada':'sin superar') : 'bloqueada'}`;
-      return `<button type="button" class="sc${v.stars?' done':''}${s.boss?' boss':''}" data-lv="${i}" ${un?'':'aria-disabled="true"'} aria-current="${i===sceneIdx}" aria-label="${esc(nm)}">`
+      const v=sceneSt(i), un=openAt(i), ok=passedAt(i); st+=v.stars;
+      const nm=`Escena ${s.act+1}-${s.n}: ${s.title}${s.boss?' (jefa)':''}, ${un ? starsTxt(v.stars)+(v.best?`, mejor ${v.best}%, ${fmtN(v.pts)} puntos`:'')+', '+(ok?'superada':'sin superar') : 'bloqueada'}`;
+      return `<button type="button" class="sc${ok?' done':''}${s.boss?' boss':''}" data-lv="${i}" ${un?'':'aria-disabled="true"'} aria-current="${i===sceneIdx}" aria-label="${esc(nm)}">`
         + `<span class="sc-n">${s.act+1}-${s.n}${s.boss?' <span class="g-crown">♛</span>':''}</span><span class="sc-t">${esc(s.title)}</span>`
         + `<span class="sc-f"><span class="stars">${un?starStr(v.stars):LOCK}</span>${un&&v.pts?`<span class="sc-p">${esc(fmtN(v.pts))} pts</span>`:''}</span></button>`;
     }).join('');
@@ -117,7 +121,7 @@ function selectScene(i){
   else { stageReset(); renderBar(); renderBest(); generate(); stageDraw(); }
   renderMap();
   const s=SCENES[i];
-  say(`Acto ${s.act+1}, escena ${s.n}: ${s.title}. ${s.bpm} ppm de ${unitName(SIGS[s.sig])}, objetivo ${s.goal}%.`);
+  say(`Acto ${s.act+1}, escena ${s.n}: ${s.title}. ${curBpm()} ppm de ${unitName(SIGS[s.sig])}, objetivo ${s.goal}%, dificultad ${diff().name.toLowerCase()}.`);
   requestAnimationFrame(centerScore);
   return true;
 }
