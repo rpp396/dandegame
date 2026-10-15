@@ -94,8 +94,8 @@ const DEFAULTS = {hold:true, metro:true, metroVol:0.7, rhythmVol:0.6, tapSound:t
 // Las estrellas piden la misma precisión en las tres; terminar la escena con vida abre la siguiente en cualquiera.
 const DIFFS = {
   facil:  {name:'Fácil',   hearts:8, tempo:0.8,  extraHurts:false, long:'8 corazones, el tempo al 80 % y los golpes de más no quitan corazón'},
-  normal: {name:'Normal',  hearts:5, tempo:1,    extraHurts:true,  short:'5 corazones', long:'5 corazones y el tempo de la escena'},
-  dificil:{name:'Difícil', hearts:3, tempo:1.15, extraHurts:true,  short:'3 corazones, más rápido', long:'3 corazones y el tempo un 15 % más rápido'},
+  normal: {name:'Normal',  hearts:5, tempo:1,    extraHurts:true,  long:'5 corazones y el tempo de la escena'},
+  dificil:{name:'Difícil', hearts:3, tempo:1.15, extraHurts:true,  long:'3 corazones y el tempo un 15 % más rápido'},
 };
 const DIFF_IDS = Object.keys(DIFFS);
 const diff = () => DIFFS[oneOf(set.diff, DIFF_IDS, 'normal')];
