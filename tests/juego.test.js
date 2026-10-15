@@ -148,6 +148,18 @@ suite('Juego', async ({ b, URL, ok, MOB, page, open, until, wf, scheduleTaps, op
   ok(r.next && r.map === null && /1-2/.test(r.cont), 'se abre la siguiente escena («Siguiente escena», el mapa y «Continuar») ' + r.cont);
   ok(/Se abre la siguiente escena\. Para la primera estrella te faltan \d+ puntos/.test(r.txt), 'el texto dice que se abre y lo que falta para la estrella: ' + r.txt);
 
+  // 11b) notas unidas por barra: un solo enemigo por grupo, con un golpe por nota
+  await openScene(p, 4, 120);
+  ok(await regen(p, "score.flat.some(e=>e.bg)"), 'ritmo con corcheas unidas por barra');
+  const ng = await p.evaluate(() => new Set(score.flat.filter(e => e.bg && !e.rest && !e.tie).map(e => e.bg)).size);
+  await p.click('#bPractice'); await waitRunning(p, 'practice');
+  await scheduleTaps(p, [0]);
+  await waitResults(p);
+  r = await p.evaluate(() => { const g = [...__t.run.groups.values()]; return { n: g.length, ok: g.every(a => a.kind === 'grupo' && a.heads >= 2 && a.done === a.heads && a.marks.length === a.heads && a.marks.every(m => m === 'hit')), h: __t.run.hearts,
+    best: [...document.querySelectorAll('#gBest b')].some(b => b.textContent === 'Banda de banderines') }; });
+  ok(r.n === ng && r.ok && r.h === 5, `cada grupo con barra es un enemigo que recibe un golpe por nota (${r.n} de ${ng})`);
+  ok(r.best, 'el bestiario presenta la banda de banderines');
+
   // 12) dificultad: corazones, tempo y golpes de más
   await p.click('#diffSeg [data-diff="facil"]');
   r = await p.evaluate(() => ({ h: document.querySelector('#gHearts').getAttribute('aria-label'), bpm: curBpm(), d: set.diff, st: JSON.parse(localStorage.getItem('orquesta-desafinada-ajustes-v1')).diff,

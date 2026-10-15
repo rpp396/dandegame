@@ -9,9 +9,12 @@
 // fx: golpe del director (movimiento de la batuta, del cuerpo y su efecto); death: cómo cae el enemigo afinado (ver burst y drawDying)
 const FOES={
   negra:{fig:'Negra', name:'Nota gruñona', hit:'Batutazo: salta y la aplasta contra las tablas', fx:'batuta', death:'squash', spr:'o_negra'},
-  corchea:{fig:'Corchea', name:'Nota con banderín', hit:'Tajo rápido que la parte en dos (llegan de dos en dos, un tajo de ida y otro de vuelta)', fx:'corte', death:'split', spr:'o_corchea'},
-  semicorchea:{fig:'Semicorchea', name:'Nota de dos banderines', hit:'Trémolo eléctrico: un rayo que la hace estallar en pedazos', fx:'tremolo', death:'shatter', spr:'o_semicorchea'},
+  corchea:{fig:'Corchea', name:'Nota con banderín', hit:'Tajo rápido que la parte en dos (sola; si va unida por barra a otras, forma una banda)', fx:'corte', death:'split', spr:'o_corchea'},
+  semicorchea:{fig:'Semicorchea', name:'Nota de dos banderines', hit:'Trémolo eléctrico: un rayo que la hace estallar en pedazos (sola o dentro de una banda)', fx:'tremolo', death:'shatter', spr:'o_semicorchea'},
   tresillo:{fig:'Tresillo', name:'Trío desafinado', hit:'Giro de batuta en cada nota; al tercero sale girando', fx:'giro', death:'spin', spr:'o_tresillo'},
+  // grupo de corcheas o semicorcheas unidas por barra: un solo enemigo que recibe un golpe por nota (el de cada figura: tajo o
+  // trémolo) y cae con el último, como lo haría esa figura. spr según cuántas notas y barras tiene (o_g<n>_<barras>, ver groupRows)
+  grupo:{fig:'Grupo con barra', name:'Banda de banderines', hit:'Un solo enemigo para todo el grupo: un golpe por nota (tajo en las corcheas, trémolo en las semicorcheas); cae con el último', fx:'corte', death:'split', spr:'o_g2_1'},
   blanca:{fig:'Blanca', name:'Nota blanca', hit:'Rayo sostenido: en piano, mantén lo que dura (si sueltas antes, contraataca); al acabar sube convertida en notas', fx:'sost', death:'ascend', spr:'o_blanca'},
   redonda:{fig:'Redonda', name:'Redonda, jefa de la escena', short:'Jefa de la escena', hit:'Calderón largo: como la blanca, mantén lo que dura', fx:'sost', death:'ascend', spr:'o_redonda'},
   silencio:{fig:'Silencio', name:'Silencio fantasma', hit:'No se toca: si lo golpeas, pierdes un corazón (en fácil, solo se ríe)', fx:'', death:'', spr:'o_silencio'},
@@ -36,6 +39,20 @@ o_blanca:['................','..........K.....','..........K.....','..........K.
 o_redonda:['................','................','................','....KKKKKKKK....','..KKWWWWWWWWKK..','.KWWWWKKKKWWWWK.','KWWEEWKKKKWEEWWK','KWWEKWK..KWEKWWK','KWWWWWK..KWWWWWK','KWWWWWKKKKWWWWWK','.KWWRRRRRRRRWWK.','..KKWWWWWWWWKK..','....KKKKKKKK....','...YY......YY...','..Y..........Y..','................'],
 o_silencio:['................','......K.........','.......K........','......KK........','.....KKK........','....KKK.........','...KKK..........','....KKK.........','.....KKK........','....KK..........','...KK...........','...K.KK.........','....KKK.........','................','................','................'],
 };
+// Bandas (grupos con barra) de n = 2 a 4 notas con 1 o 2 barras: cabezas con ojos y boca, plicas a la derecha y barras arriba.
+// GROUP_HX: centro de cada cabeza (en píxeles del sprite), para marcar las notas ya afinadas y hacerlas saltar
+const GROUP_MAX=4, GROUP_HX={o_tresillo:[2,7,12]};
+function groupRows(n, beams){
+  const w=n<=3?4:3, off=Math.floor((16-(n*w+n-1))/2), rows=Array.from({length:16},()=>[...'.'.repeat(16)]);
+  const head=w===4?['.KK.','KKKK','KEKE','KRRK','.KK.']:['.KK','KKK','EKE','KRK','.K.'], hx=[];
+  for(let i=0;i<n;i++){ const x0=off+i*(w+1); hx.push(x0+(w-1)/2);
+    head.forEach((r,dy)=>{ for(let k=0;k<w;k++) if(r[k]!=='.') rows[9+dy][x0+k]=r[k]; });
+    for(let y=3;y<=9;y++) rows[y][x0+w-1]='K'; }
+  const a=off+w-1, b=off+(n-1)*(w+1)+w-1;
+  for(let x=a;x<=b;x++){ rows[3][x]='K'; if(beams>1) rows[5][x]='K'; }
+  return {rows:rows.map(r=>r.join('')), hx};
+}
+for(let n=2;n<=GROUP_MAX;n++) for(const bm of [1,2]){ const k=`o_g${n}_${bm}`, r=groupRows(n,bm); SPR[k]=r.rows; GROUP_HX[k]=r.hx; }
 // Puntillo: un punto a la derecha de la cabeza (fila 11)
 function dotRows(rows){ return rows.map((r,y)=>{ if(y!==11) return r; const c=Math.min(15,r.replace(/\.+$/,'').length+1); return r.slice(0,c)+'K'+r.slice(c+1); }); }
 const sprC={}, footC={};
@@ -118,15 +135,17 @@ function slotX(big){
 function spawn(x, pt){
   if(x.actor) return x.actor;
   if(x.gk && run.groups.has(x.gk)) return x.actor=run.groups.get(x.gk);
-  const e=x.e, sc=scene(), big=!!sc.boss && figKey(e)===sc.boss && !e.tie, key=FOES[x.kind].spr+(dotted(e)?'.':''), spt=S.spt;
-  const len=(x.gk?12:e.rest||e.tie?e.dur:e.len)*spt;
+  const e=x.e, sc=scene(), big=!!sc.boss && figKey(e)===sc.boss && !e.tie, spt=S.spt, kind=x.gk?x.gkind:x.kind;
+  const key=x.gk?x.gkey:FOES[kind].spr+(dotted(e)?'.':''), len=(x.gk?x.glen:e.rest||e.tie?e.dur:e.len)*spt;
   // v: variante del golpe (0/1), alterna entre enemigos seguidos (tajo de ida y de vuelta, batutazo por arriba y por abajo)
-  const a={kind:x.kind, key, big, s:big?4:3, x:big?98:104, t0:pt, te:Math.min(0.12,Math.max(0.05,len*0.4)), end:pt+len, st:'enter', heads:x.gk?3:1, done:0, flash:-9, laugh:-9,
-    death:FOES[x.kind].death, v:(run.vary++)%2};
+  // heads: notas que hay que afinar (más de una en un grupo con barra o un tresillo); marks: 'hit' o 'miss' de cada una, en orden
+  const a={kind, key, big, s:big?4:3, x:big?98:104, t0:pt, te:Math.min(0.12,Math.max(0.05,len*0.4)), end:pt+len, st:'enter', heads:x.gk?x.gn:1, done:0, flash:-9, laugh:-9,
+    marks:[], hx:GROUP_HX[key]||[], death:FOES[x.gk?x.kind:kind].death, v:(run.vary++)%2};
   if(e.rest){ a.st='ghost'; a.life=Math.max(0.9,len); a.s=3; }
   else { a.x=slotX(big); if(e.tie) a.calm=true; }
   actors.push(a); x.actor=a; if(x.gk) run.groups.set(x.gk,a);
-  if(x.head) cap(`${FOES[x.kind].fig}${dotted(e)?' con puntillo':''} → ${FOES[x.kind].short||FOES[x.kind].name}`, null);
+  if(x.gk && kind==='grupo') cap(`Banda de ${x.gn} notas → un golpe por nota`, null);
+  else if(x.head) cap(`${FOES[kind].fig}${dotted(e)?' con puntillo':''} → ${FOES[kind].short||FOES[kind].name}`, null);
   else if(e.rest) cap('Silencio → fantasma: no se toca', null);
   return a;
 }
@@ -166,7 +185,8 @@ const SAY_EXACT=['¡AFINADA!','¡PERFECTA!','¡EXACTA!'], SAY_GOOD=['¡BIEN!','�
 const pick=l=>l[Math.floor(Math.random()*l.length)];
 function strike(x, pn, cls, gain){
   const a=x.actor, fx=FOES[x.kind].fx;
-  if(x.kind==='tresillo'){ a.done++; a.flash=pn; if(a.done+(a.missed||0)>=a.heads){ a.st='hit'; a.t1=pn; } }
+  if(a.heads>1){ a.done++; a.flash=pn; a.marks[x.hi]='hit'; a.death=FOES[x.kind].death;   // cae como la figura del último golpe
+    if(a.done+(a.missed||0)>=a.heads){ a.st='hit'; a.t1=pn; } }
   else if(LONG.has(x.kind)){ a.st='held'; a.t1=pn; }
   else { a.st='hit'; a.t1=pn; }
   dir={a:'strike', fx, t0:pn, tgt:a, v:a.v};
@@ -175,8 +195,8 @@ function strike(x, pn, cls, gain){
     // destello del acierto: anillo dorado y cruz en el exacto, anillo blanco en el bien, nada en el cerca
     if(cls==='exact'){ P({kind:'ring', x:c[0], y:c[1], r0:3, r1:16, life:.3, col:'#f2c14e', t0:pn}); P({kind:'star', x:c[0], y:c[1]-4, r1:7, life:.2, col:'#ffffff', t0:pn}); }
     else if(cls==='good') P({kind:'ring', x:c[0], y:c[1], r0:3, r1:10, life:.25, col:'#f4f1ea', t0:pn});
-    // cada nota del trío afinada salta como una corchea dorada
-    if(x.kind==='tresillo'){ const [ax,ay]=pos(a,pn), hx=ax+[3,8,13][Math.min(2,a.done-1)]*a.s; P({kind:'note', x:hx-2, y:ay+8*a.s, vx:rnd(-12,12), vy:-55, life:.5, col:'#f2c14e', gr:90, t0:pn}); }
+    // cada nota afinada de un trío o de una banda salta como una corchea dorada
+    if(a.heads>1 && a.hx.length){ const [ax,ay]=pos(a,pn), hx=ax+Math.round(a.hx[x.hi]*a.s); P({kind:'note', x:hx-2, y:ay+8*a.s, vx:rnd(-12,12), vy:-55, life:.5, col:'#f2c14e', gr:90, t0:pn}); }
   }
   if(run.demo) return;
   const top=a.big?24:34;
@@ -204,7 +224,14 @@ function center(a,pn){ const p=pos(a,pn); return [p[0]+8*a.s, p[1]+(a.kind==='re
 function gameStart(){
   if(S.mode!=='practice' && S.mode!=='play'){ run=null; return; }
   const demo=S.mode==='play', off=demo?0:S.off, byI=new Map(S.notes.map(n=>[n.i,n]));
-  const evs=score.flat.map(e=>{ const kind=kindOf(e); return {e, kind, rel:e.abs*S.spt+off, n:byI.get(e.i)||null, head:!e.rest&&!e.tie, gk:kind==='tresillo'?e.m+':'+e.cell:null, hit:false, missed:false, actor:null}; });
+  // Grupos (tresillos y notas unidas por barra, e.bg de generate): las notas que se tocan de cada uno; con 2 a GROUP_MAX, un solo enemigo
+  const grp=new Map(); score.flat.forEach(e=>{ if(e.bg && !e.rest && !e.tie){ if(!grp.has(e.bg)) grp.set(e.bg,[]); grp.get(e.bg).push(e); } });
+  const evs=score.flat.map(e=>{ const kind=kindOf(e), x={e, kind, rel:e.abs*S.spt+off, n:byI.get(e.i)||null, head:!e.rest&&!e.tie, gk:null, hit:false, missed:false, actor:null};
+    const g=x.head && e.bg ? grp.get(e.bg) : null;
+    if(g && g.length>1 && g.length<=GROUP_MAX){ const last=g[g.length-1], tup=g.some(t=>t.tuplet);
+      Object.assign(x, {gk:e.bg, gn:g.length, hi:g.indexOf(e), glen:last.abs+last.len-g[0].abs, gkind:tup?'tresillo':'grupo',
+        gkey:tup?'o_tresillo':`o_g${g.length}_${g.some(t=>t.dur===3)?2:1}`}); }
+    return x; });
   const D=diff();
   run={demo, live:true, hearts:D.hearts, max:D.hearts, extraHurts:D.extraHurts, vary:0, combo:0, maxCombo:0, pts:0, evs, ptr:0, groups:new Map(), hits:0, nHeads:evs.filter(x=>x.head).length, lost:false};
   actors=[]; parts=[]; texts=[]; banner=null; dir={a:'idle',t0:0};
@@ -316,7 +343,7 @@ function misses(h, pn){
     if(h <= x.n.t+x.n.win+GRACE) break;   // en orden de tiempo: las siguientes aún están a tiempo
     x.missed=true;
     const a=spawn(x, toPn(x.n.t,h,pn));
-    if(x.kind==='tresillo'){ a.missed=(a.missed||0)+1; }
+    if(a.heads>1){ a.missed=(a.missed||0)+1; a.marks[x.hi]='miss'; }
     hurt('miss', pn, a);
     if(!run.live) return;
   }
@@ -451,7 +478,7 @@ function drawActor(a, pn){
   if(a.st==='held') over=['f',reduce()?.25:.15+.1*Math.sin(pn*10)];
   drawSpr(a.key, x, y, a.s, {alpha:Math.max(0,alpha), over});
   if(a.calm && a.st!=='leave'){ g.fillStyle='#f4f1ea'; for(let k=0;k<=180;k+=15){ const r=k*Math.PI/180; g.fillRect(Math.round(x+8*a.s-Math.cos(r)*12), Math.round(y+a.s-Math.sin(r)*4),2,1); } }   // ligadura sobre la nota ligada
-  if(a.kind==='tresillo' && a.done && a.st!=='dying'){ g.fillStyle='#f2c14e'; for(let k=0;k<a.done;k++) g.fillRect(x+[3,8,13][k]*a.s-1, y+15*a.s, 3, 2); }   // notas del trío ya afinadas
+  if(a.heads>1 && a.st!=='dying') a.marks.forEach((m,k)=>{ if(m!=='hit' || a.hx[k]==null) return; g.fillStyle='#f2c14e'; g.fillRect(x+Math.round(a.hx[k]*a.s)-1, y+15*a.s, 3, 2); });   // notas del grupo ya afinadas
 }
 // Cómo cae cada enemigo afinado (sin movimiento reducido): aplastado, partido en dos, girando o subiendo; el que estalla ya es partículas
 function drawSprPart(key, sx, sy, sw, sh, dx, dy, dw, dh, alpha){
@@ -524,6 +551,7 @@ function renderBest(){
   const s=scene(), rows=[];
   FIGS.filter(f=>s.figs.includes(f.k)).forEach(f=>{ const [k,dot]=FIGK[f.k], F=FOES[k];
     rows.push({img:F.spr+(dot?'.':''), fig:f.name, name:F.name+(dot?' con puntillo':'')+(s.boss===f.k?' · jefa':''), hit:F.hit+(dot?' (dura la mitad más)':'')}); });
+  if(s.figs.includes('e') || s.figs.includes('s')) rows.push({img:s.figs.includes('s')?'o_g4_2':'o_g2_1', fig:'Notas con barra', name:FOES.grupo.name, hit:FOES.grupo.hit});
   if(restList(s).length) rows.push({img:'o_silencio', fig:'Silencios', name:FOES.silencio.name, hit:FOES.silencio.hit});
   if(s.ties) rows.push({img:'o_negra', fig:'Ligadura', name:'Nota ligada', hit:'No se vuelve a tocar: el enemigo se queda en pie y se va solo'});
   $('#gBest').innerHTML=rows.map(r=>`<li><img src="${thumb(r.img)}" alt="" width="44" height="44"><span><small>${esc(r.fig)}</small><b>${esc(r.name)}</b>${esc(r.hit)}</span></li>`).join('');
