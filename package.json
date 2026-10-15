@@ -1,0 +1,11 @@
+{
+  "name": "orquesta-desafinada",
+  "private": true,
+  "description": "Juego web de lectura rítmica (sin build). Este package.json solo existe para las pruebas.",
+  "scripts": {
+    "test": "node tests/run.js"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}
