@@ -211,6 +211,9 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-b
 .mode-pick{display:flex;flex-direction:column;gap:6px}
 .mode-lbl{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .modeseg{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.diffseg{grid-template-columns:repeat(3,1fr)}
+.diffseg button{min-width:0}
+.set-body .diffseg{grid-template-columns:1fr}
 .modeseg button{display:flex;align-items:center;gap:10px;text-align:left;border:2px solid var(--ui);background:var(--paper);color:var(--ink);padding:10px 12px;border-radius:12px;cursor:pointer;font:inherit;min-height:56px}
 .modeseg button svg{width:30px;height:30px;flex:none;color:var(--muted)}
 .modeseg button span{display:flex;flex-direction:column;gap:1px;min-width:0}

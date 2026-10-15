@@ -66,11 +66,25 @@ function generate(){
   const measures=ms.map(m=>m.evs), fb=ms.some(m=>m.fb);
   const flat=[];
   measures.forEach((evs,mi)=>evs.forEach(e=>{ e.m=mi; e.abs=mi*L+e.start; e.i=flat.length; flat.push(e); }));
+  // e.bg: grupo unido por barra («compás:n») de cada nota (no de los silencios): en el escenario es un solo enemigo
+  measures.forEach((evs,mi)=>beamRuns(evs).forEach((r,k)=>r.forEach(e=>{ if(!e.rest) e.bg=mi+':'+k; })));
   if(C.ties) addTies(flat);
   chainTies(flat);
   score={sid:C.id,key:C.sig,bars:C.bars,sig,L,measures,flat,fb};
   judg=[]; extras=0; extraTks=[]; hideResults();
   renderScore(); updateFab();
+}
+// Grupos unidos por barra de un compás (la misma regla para la partitura y para el escenario): dentro de cada celda (pulso), las
+// figuras de menos de una negra seguidas, con los silencios cortos que tengan en medio; solo los grupos con dos notas o más
+function beamRuns(evs){
+  const runs=[]; let run=[], cell=null;
+  const flush=()=>{ while(run.length && run[run.length-1].rest) run.pop(); if(run.filter(e=>!e.rest).length>1) runs.push(run); run=[]; };
+  evs.forEach(e=>{
+    if(e.cell!==cell){ flush(); cell=e.cell; }
+    if(e.dur<12 && (run.length || !e.rest)) run.push(e); else if(!(e.rest && e.dur<12)) flush();
+  });
+  flush();
+  return runs;
 }
 // e.len = duración que suena (la nota ligada suma las que le siguen); e.head = nota que se toca
 function chainTies(flat){ flat.forEach(e=>{ e.len=e.dur; e.head=e.i; if(e.tie){ const h=flat[flat[e.i-1].head]; e.head=h.i; h.len+=e.dur; } }); }

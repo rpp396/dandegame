@@ -133,9 +133,55 @@ suite('Juego', async ({ b, URL, ok, MOB, page, open, until, wf, scheduleTaps, op
   });
   ok(r.c === '{"G1":{"best":100,"stars":3,"tries":0,"pts":0},"G3":{"best":80,"stars":2,"tries":3,"pts":10000000}}', 'cleanProg: solo ids de escenas existentes, con números en rango ' + r.c);
   ok(r.bad === '{"scenes":{}}' && r.nul === '{"scenes":{}}' && r.proto, 'cleanProg: tipos equivocados → vacío, sin contaminar Object.prototype');
+  r = await p.evaluate(() => JSON.stringify(cleanProg({ scenes: { G1: { best: 50, stars: 0, tries: 1, pts: 9, clear: 1 }, G2: { clear: 'sí' }, G3: { clear: 7 } } }).scenes));
+  ok(r === '{"G1":{"best":50,"stars":0,"tries":1,"pts":9,"clear":1},"G2":{"best":0,"stars":0,"tries":0,"pts":0},"G3":{"best":0,"stars":0,"tries":0,"pts":0,"clear":1}}', 'cleanProg: clear solo se guarda si vale 1 ' + r);
+
+  // 11) llegar al final con vida supera la escena y abre la siguiente, aunque no llegue a la estrella
+  await p.evaluate(() => { prog.scenes = {}; commitProg(); });
+  sc = await openScene(p, 0, 120);
+  await p.click('#bPractice'); await waitRunning(p, 'practice');
+  await scheduleTaps(p, [0, null, 0, 0, null, 0, 0, null]);
+  await waitResults(p);
+  r = await p.evaluate(() => ({ head: document.querySelector('#gResHead').textContent, g: prog.scenes.G1, hearts: __t.run.hearts, next: !document.querySelector('#gNext').hidden,
+    map: document.querySelector('#gMap .sc[data-lv="1"]').getAttribute('aria-disabled'), cont: document.querySelector('#bContinue').textContent, txt: document.querySelector('#gResText').textContent }));
+  ok(r.head === '¡Escena superada!' && r.g.stars === 0 && r.g.clear === 1 && r.hearts > 0, 'con vida y sin estrella: «¡Escena superada!» y clear ' + JSON.stringify(r.g));
+  ok(r.next && r.map === null && /1-2/.test(r.cont), 'se abre la siguiente escena («Siguiente escena», el mapa y «Continuar») ' + r.cont);
+  ok(/Se abre la siguiente escena\. Para la primera estrella te faltan \d+ puntos/.test(r.txt), 'el texto dice que se abre y lo que falta para la estrella: ' + r.txt);
+
+  // 11b) notas unidas por barra: un solo enemigo por grupo, con un golpe por nota
+  await openScene(p, 4, 120);
+  ok(await regen(p, "score.flat.some(e=>e.bg)"), 'ritmo con corcheas unidas por barra');
+  const ng = await p.evaluate(() => new Set(score.flat.filter(e => e.bg && !e.rest && !e.tie).map(e => e.bg)).size);
+  await p.click('#bPractice'); await waitRunning(p, 'practice');
+  await scheduleTaps(p, [0]);
+  await waitResults(p);
+  r = await p.evaluate(() => { const g = [...__t.run.groups.values()]; return { n: g.length, ok: g.every(a => a.kind === 'grupo' && a.heads >= 2 && a.done === a.heads && a.marks.length === a.heads && a.marks.every(m => m === 'hit')), h: __t.run.hearts,
+    best: [...document.querySelectorAll('#gBest b')].some(b => b.textContent === 'Banda de banderines') }; });
+  ok(r.n === ng && r.ok && r.h === 5, `cada grupo con barra es un enemigo que recibe un golpe por nota (${r.n} de ${ng})`);
+  ok(r.best, 'el bestiario presenta la banda de banderines');
+
+  // 12) dificultad: corazones, tempo y golpes de más
+  await p.click('#diffSeg [data-diff="facil"]');
+  r = await p.evaluate(() => ({ h: document.querySelector('#gHearts').getAttribute('aria-label'), bpm: curBpm(), d: set.diff, st: JSON.parse(localStorage.getItem('orquesta-desafinada-ajustes-v1')).diff,
+    pr: [...document.querySelectorAll('[data-diff="facil"]')].every(b => b.getAttribute('aria-pressed') === 'true'), meta: document.querySelector('#lvMeta').textContent }));
+  ok(r.h === '8 de 8 corazones' && r.bpm === 96 && r.d === 'facil' && r.st === 'facil' && r.pr, 'fácil: 8 corazones, tempo al 80 %, guardado y marcado en los dos selectores ' + JSON.stringify(r));
+  ok(/Negra = 96/.test(r.meta) && /Fácil: 8/.test(r.meta), 'la ficha da el tempo y los corazones de la dificultad: ' + r.meta);
+  await p.click('#bPractice'); await waitRunning(p, 'practice');
+  await scheduleTaps(p, [0], 6);
+  await waitResults(p);
+  r = await p.evaluate(() => ({ h: __t.run.hearts, x: +document.querySelector('#cExtra').textContent, stats: document.querySelector('#gResStats').textContent }));
+  ok(r.h === 8 && r.x === 1 && /Corazones: 8 de 8/.test(r.stats) && /Dificultad: Fácil/.test(r.stats), 'fácil: el golpe de más cuenta en la precisión pero no quita corazón ' + JSON.stringify(r));
+  await p.click('#diffSeg [data-diff="dificil"]');
+  ok(await p.evaluate(() => document.querySelector('#gHearts').getAttribute('aria-label') === '3 de 3 corazones' && curBpm() === 138), 'difícil: 3 corazones y tempo un 15 % más rápido');
+  await p.click('#bPractice'); await waitRunning(p, 'practice');
+  ok(await p.evaluate(() => __t.run.hearts === 3 && __t.run.max === 3 && Math.abs(__t.S.spt * 12 * 138 - 60) < 1e-6), 'difícil: la pasada empieza con 3 corazones a 138 ppm');
+  await p.keyboard.press('Escape'); await waitStopped(p);
+  ok(await p.evaluate(() => cleanSettings({ diff: '__proto__' }).diff === 'normal' && cleanSettings({ diff: 'dificil' }).diff === 'dificil'), 'cleanSettings: solo dificultades conocidas');
+  await p.click('#diffSeg [data-diff="normal"]');
+  ok(p.errs.length === 0 && (await p.csp()).length === 0, 'avance y dificultad sin errores ni CSP ' + p.errs.join(' | '));
   await p.context().close();
 
-  // 11) móvil: sin desplazamiento horizontal, escenario y botón flotante
+  // 13) móvil: sin desplazamiento horizontal, escenario y botón flotante
   for (const w of [360, 390]) {
     const m = await page(b, { ...MOB, viewport: { width: w, height: w === 360 ? 640 : 844 } }); await open(m, URL);
     await m.tap('#bContinue'); await wf(m, () => __t.view === 'escena'); await m.waitForTimeout(300);

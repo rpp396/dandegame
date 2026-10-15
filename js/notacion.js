@@ -136,14 +136,7 @@ function measureSVG(mi,mx,MW){
   let cum=0;
   evs.forEach(e=>{ e.x=mx+14+cum*sc+6; e.ny=ny; cum+=evW(e); });
   // barras: un grupo por celda (pulso); dentro del grupo, las figuras con barra se unen por encima de los silencios cortos que tengan en medio
-  const beamed=new Set(), runs=[];
-  let run=[], cell=null;
-  const flush=()=>{ while(run.length && run[run.length-1].rest) run.pop(); if(run.filter(e=>!e.rest).length>1){ runs.push(run); run.forEach(e=>{ if(!e.rest) beamed.add(e); }); } run=[]; };
-  evs.forEach(e=>{
-    if(e.cell!==cell){ flush(); cell=e.cell; }
-    if(e.dur<12 && (run.length || !e.rest)) run.push(e); else if(!(e.rest && e.dur<12)) flush();
-  });
-  flush();
+  const runs=beamRuns(evs), beamed=new Set(runs.flat().filter(e=>!e.rest));   // beamRuns: generacion.js
   let s='';
   evs.forEach(e=>{
     const j=judg[e.i], jc=judg[e.head];

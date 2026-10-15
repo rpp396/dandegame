@@ -6,7 +6,7 @@ function syncControls(){
   ['metro','tapSound','fab','vibrate'].forEach(id=>{ $('#'+id).checked=!!set[id]; });
   $('#vibrateRow').hidden=!('vibrate' in navigator && touchMQ.matches);
   $('#rhythmVol').value=set.rhythmVol; $('#metroVol').value=set.metroVol; $('#tapVol').value=set.tapVol; $('#offset').value=set.offset;
-  syncTapVol(); syncHold(); updOutputs();
+  syncTapVol(); syncHold(); syncDiff(); updOutputs();
 }
 function syncTapVol(){ $('#tapVolField').hidden=!set.tapSound; }
 function updOutputs(){
@@ -20,9 +20,19 @@ function updOutputs(){
   document.querySelectorAll('.offset-now').forEach(e=>{ e.textContent=off; });
 }
 // Forma de tocar: hay un selector en la escena y otro en los ajustes (botones con data-hold)
-function syncHold(){ document.querySelectorAll('.modeseg button').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.hold==='1')===!!set.hold))); }
+function syncHold(){ document.querySelectorAll('.modeseg button[data-hold]').forEach(b=>b.setAttribute('aria-pressed',String((b.dataset.hold==='1')===!!set.hold))); }
 function setHold(v){ set.hold=!!v; save(); syncHold(); if(S.running && S.mode==='practice') stop(); }
-document.querySelectorAll('.modeseg').forEach(m=>m.addEventListener('click',e=>{ const b=e.target.closest('button'); if(b) setHold(b.dataset.hold==='1'); }));
+document.querySelectorAll('.modeseg').forEach(m=>m.addEventListener('click',e=>{ const b=e.target.closest('button[data-hold]'); if(b) setHold(b.dataset.hold==='1'); }));
+// Dificultad: también un selector en la escena y otro en los ajustes (botones con data-diff). Cambia corazones y tempo: para la pasada
+function syncDiff(){ document.querySelectorAll('.diffseg button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.diff===set.diff))); }
+function setDiff(v){
+  const d=oneOf(v,DIFF_IDS,set.diff); if(d===set.diff) return;
+  set.diff=d; save(); syncDiff();
+  if(S.running && (S.mode==='practice' || S.mode==='play')) stop();
+  renderBar(); stageHud();
+  say(`Dificultad ${DIFFS[d].name.toLowerCase()}: ${DIFFS[d].long}.`);
+}
+document.querySelectorAll('.diffseg').forEach(m=>m.addEventListener('click',e=>{ const b=e.target.closest('button[data-diff]'); if(b) setDiff(b.dataset.diff); }));
 // el metrónomo vale para los compases que aún no se han programado (no hace falta parar)
 $('#metro').addEventListener('change',e=>{ set.metro=e.target.checked; save(); });
 $('#tapSound').addEventListener('change',e=>{ set.tapSound=e.target.checked; save(); syncTapVol(); });
@@ -57,7 +67,7 @@ $('#resetBox').addEventListener('click',e=>{
   if(id==='resetSet') askConfirm(box,'¿Volver a los ajustes iniciales? Se conservan tu avance y la corrección de latencia.',['resetYes','Restablecer'],['resetNo','Cancelar']);
   else if(id==='resetYes'){
     const keep={offset:set.offset, seen:set.seen, gameId:set.gameId, view:set.view};
-    set={...freshSettings(), ...keep}; save(); syncControls(); updateFab();
+    set={...freshSettings(), ...keep}; save(); syncControls(); updateFab(); renderBar(); stageHud();
     endConfirm(box,RESET_BTN); $('#resetSet').focus(); say('Ajustes restablecidos');
   }
   else if(id==='resetNo'){ endConfirm(box,RESET_BTN); $('#resetSet').focus(); }
