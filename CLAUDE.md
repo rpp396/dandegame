@@ -105,11 +105,10 @@ Sin dependencias ni build: `index.html` (solo HTML), `styles.css` (todos los est
 - `a11y.test.js`: contraste, estructura y salto, nombres accesibles, foco (mapa, flechas, diálogo, confirmaciones, bienvenida), deslizadores, movimiento reducido, colores forzados, formas de los marcadores, «Reiniciar» con teclado y foco no tapado.
 - `movil.test.js`: 320, 360, 390 px y horizontal sin desbordar y con 44 px (también el diálogo), botón flotante en sus estados, resultados encuadrados con el botón de tres partes, sin botón flotante, alturas en pantallas bajas y latencia a la vista.
 
-**Capturas del README** (`docs/capturas/`): `escritorio-mapa.png`, `escritorio-escena.png` (1200 px) y `movil-escena.png`, `movil-resultado.png` (390 px ×2), hechas con Playwright con avance de ejemplo sembrado en `localStorage` y toques simulados. Si cambia la interfaz, conviene rehacerlas.
+**Capturas del README** (`docs/capturas/`): `escritorio-mapa.png`, `escritorio-escena.png` (1200 px) y `movil-escena.png`, `movil-resultado.png` (390 px ×2), hechas con Playwright con avance de ejemplo sembrado en `localStorage` y toques simulados. No se rehacen con cada cambio de la interfaz: se harán de nuevo cuando la app llegue a su versión final.
 
 ## Ideas pendientes
 
 - Más escenas y actos (corchea con puntillo, 12/8, silencios de semicorchea, compases de amalgama) reutilizando las plantillas de la app de solfeo.
 - Un récord por escena con el detalle de la mejor pasada (y con qué dificultad), y sonidos propios del escenario (acierto, corazón perdido, telón).
-- Las capturas de `docs/capturas/` son de antes del selector de dificultad: conviene rehacerlas.
 - Traducción al inglés.
