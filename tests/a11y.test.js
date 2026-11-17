@@ -142,12 +142,14 @@ suite('Accesibilidad', async ({ b, URL, ok, MOB, page, open, until, wf, waitRunn
   ok(await p.evaluate(() => document.getElementById('fabRestart').getAttribute('aria-describedby') === 'restartHelp' && /Intro o Espacio/.test(document.getElementById('restartHelp').textContent)), '«Reiniciar»: su ayuda dice que con teclado basta Intro o Espacio');
   ok(await p.evaluate(() => !document.getElementById('tapFab').hasAttribute('aria-label') && document.getElementById('tapFab').textContent.length > 0), '#tapFab: nombre accesible = su texto visible');
   await p.evaluate(() => { window.__taps = 0; const o = window.tap; window.tap = (...a) => { window.__taps++; return o(...a); }; });
-  const t0 = await p.evaluate(() => __t.S.passStart);
+  // cada start() crea un S nuevo: se compara el objeto, no S.passStart (sale del reloj del audio, que en un CI lento puede quedarse
+  // quieto unos milisegundos y dar la misma hora a dos reinicios seguidos)
+  await p.evaluate(() => { window.__S0 = __t.S; });
   await p.focus('#fabRestart'); await p.keyboard.press('Enter');
-  ok(await until(p, t => __t.S.running && __t.S.mode === 'practice' && __t.S.passStart !== t, t0), 'Intro en «Reiniciar» reinicia la escena al instante');
-  const t1 = await p.evaluate(() => __t.S.passStart);
+  ok(await until(p, () => __t.S !== window.__S0 && __t.S.running && __t.S.mode === 'practice'), 'Intro en «Reiniciar» reinicia la escena al instante');
+  await p.evaluate(() => { window.__S1 = __t.S; });
   await p.focus('#fabRestart'); await p.keyboard.press('Space');
-  ok(await until(p, t => __t.S.passStart !== t, t1), 'Espacio en «Reiniciar» también reinicia');
+  ok(await until(p, () => __t.S !== window.__S1 && __t.S.running), 'Espacio en «Reiniciar» también reinicia');
   ok(await p.evaluate(() => window.__taps === 0), 'y no cuentan como toques');
   await p.keyboard.press('Escape'); await wf(p, () => !__t.S.running);
   // foco no tapado por el botón flotante (2.4.11): se recorre la escena con Tab
