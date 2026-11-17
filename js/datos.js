@@ -86,9 +86,9 @@ const restList = C => C.rests || [];
 
 /* ---------- Ajustes ---------- */
 // hold: modo piano (se mide también cuándo se suelta); metro: metrónomo durante la escena (la cuenta previa suena siempre);
-// rhythmVol: volumen de «Escuchar»; tapSound/tapVol: oír mis toques; fab: botón flotante en pantallas táctiles;
+// rhythmVol: volumen de «Escuchar»; tapSound/tapVol: oír mis toques; fab: botón flotante en pantallas táctiles; guide: línea guía en la partitura;
 // offset: corrección de latencia (ms, + si se llega tarde); diff: dificultad (ver DIFFS); gameId: escena abierta; view: pantalla ('mapa' o 'escena')
-const DEFAULTS = {hold:true, metro:true, metroVol:0.7, rhythmVol:0.6, tapSound:true, tapVol:0.6, fab:true, vibrate:true,
+const DEFAULTS = {hold:true, metro:true, metroVol:0.7, rhythmVol:0.6, tapSound:true, tapVol:0.6, fab:true, vibrate:true, guide:true,
   offset:0, diff:'normal', seen:false, gameId:'', view:'mapa'};
 // Dificultad: corazones de la pasada, tempo (factor sobre el de la escena) y si un golpe de más quita corazón.
 // Las estrellas piden la misma precisión en las tres; terminar la escena con vida abre la siguiente en cualquiera.
@@ -113,7 +113,7 @@ function cleanSettings(o){
   const D=DEFAULTS, s=freshSettings(); if(!isObj(o)) return s;
   s.offset = numIn(o.offset,-500,500,D.offset,true);
   ['rhythmVol','metroVol','tapVol'].forEach(k=>{ s[k]=numIn(o[k],0,1,D[k]); });
-  ['hold','metro','tapSound','fab','vibrate','seen'].forEach(k=>{ s[k]=typeof o[k]==='boolean' ? o[k] : D[k]; });
+  ['hold','metro','tapSound','fab','vibrate','guide','seen'].forEach(k=>{ s[k]=typeof o[k]==='boolean' ? o[k] : D[k]; });
   s.gameId = strIn(o.gameId,/^G\d{1,3}$/,'');
   s.view = oneOf(o.view,['mapa','escena'],D.view);
   s.diff = oneOf(o.diff,DIFF_IDS,D.diff);

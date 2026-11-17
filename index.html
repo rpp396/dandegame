@@ -165,6 +165,9 @@
                 <button type="button" data-hold="0"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="11" rx="8.5" ry="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 11v5.5c0 1.7 3.8 3 8.5 3s8.5-1.3 8.5-3V11" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 13.6v5M10 14.2v5.2M14 14.2v5.2M18 13.6v5" stroke="currentColor" stroke-width="1.1"/><path d="M5 2.5l7 7M19 2.5l-7 7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg><span><b>Batería</b><small>Solo cuenta el golpe</small></span></button>
               </div>
             </div>
+            <div class="p-opts">
+              <button class="btn" id="bGuide" type="button" aria-pressed="true"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1 4.5h14M1 8h14M1 11.5h14" stroke="currentColor" stroke-width="1" opacity=".55"/><path d="M8.5 1.5v13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>Línea guía</button>
+            </div>
             <div class="mode-pick">
               <span class="mode-lbl" id="diffLbl">Dificultad</span>
               <div class="modeseg diffseg" id="diffSeg" role="group" aria-labelledby="diffLbl">
@@ -209,6 +212,7 @@
           <button type="button" data-diff="dificil"><span><b>Difícil</b><small>3 corazones y el tempo un 15 % más rápido</small></span></button>
         </div>
       </div>
+      <label class="sw"><input type="checkbox" id="guide"><span class="track"></span><span>Línea guía en la partitura<small>Una línea recorre el pentagrama al ritmo de la escena y de «Escuchar», para seguir la nota que toca. También se cambia con el botón «Línea guía» de la escena.</small></span></label>
       <h3>Sonido</h3>
       <label class="sw"><input type="checkbox" id="metro"><span class="track"></span><span>Metrónomo durante la escena<small>La cuenta previa suena siempre. Sin metrónomo, llevas tú el pulso.</small></span></label>
       <div class="field"><span class="rlabel">Volumen del metrónomo <output id="metroVolOut"></output></span><input type="range" id="metroVol" min="0" max="1" step="0.05" aria-label="Volumen del metrónomo"></div>

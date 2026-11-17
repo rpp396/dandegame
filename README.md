@@ -16,6 +16,8 @@ Se juega con el dedo, el ratón o el teclado (la barra espaciadora), en el móvi
 
 **Dificultad:** **Fácil** (8 corazones, el tempo al 80 % y los golpes de más no quitan corazón), **Normal** (5 corazones) o **Difícil** (3 corazones y el tempo un 15 % más rápido). Se elige en la escena o en *Ajustes*; las estrellas piden la misma precisión en las tres.
 
+**Línea guía:** una línea recorre el pentagrama al ritmo de la escena (y de *Escuchar*) para seguir la nota que toca. Se muestra u oculta con el botón *Línea guía* de la escena o en *Ajustes*.
+
 **Forma de tocar:** en **Piano** (la de por defecto) mantienes pulsada cada nota lo que dura y también se mide cuándo la sueltas; soltar antes de tiempo una blanca o una redonda hace que contraataque. En **Batería** solo cuenta el golpe, que suena como un redoblante. Se elige en la escena o en *Ajustes*.
 
 Durante la escena, **Esc** (o *Detener*) la abandona sin resultados. En el móvil, el botón flotante tiene a la izquierda **Reiniciar** (mantener pulsado medio segundo) y, al terminar, se convierte en *Reintentar · Gira · Siguiente*.
