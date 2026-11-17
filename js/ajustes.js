@@ -3,7 +3,8 @@
 
 /* ---------- Controles ---------- */
 function syncControls(){
-  ['metro','tapSound','fab','vibrate'].forEach(id=>{ $('#'+id).checked=!!set[id]; });
+  ['metro','tapSound','fab','vibrate','guide'].forEach(id=>{ $('#'+id).checked=!!set[id]; });
+  syncGuide();
   $('#vibrateRow').hidden=!('vibrate' in navigator && touchMQ.matches);
   $('#rhythmVol').value=set.rhythmVol; $('#metroVol').value=set.metroVol; $('#tapVol').value=set.tapVol; $('#offset').value=set.offset;
   syncTapVol(); syncHold(); syncDiff(); updOutputs();
@@ -40,6 +41,11 @@ $('#tapSound').addEventListener('change',e=>{ set.tapSound=e.target.checked; sav
 $('#offset').addEventListener('input',e=>{ set.offset=numIn(e.target.value,-150,250,set.offset,true); updOutputs(); save(); });
 $('#fab').addEventListener('change',e=>{ set.fab=e.target.checked; save(); updateFab(); if(!S.running) padIdle(); });
 $('#vibrate').addEventListener('change',e=>{ set.vibrate=e.target.checked; save(); });
+// Línea guía: el botón de la escena y el interruptor de los ajustes; se puede cambiar en mitad de la pasada
+function syncGuide(){ $('#bGuide').setAttribute('aria-pressed',String(!!set.guide)); $('#guide').checked=!!set.guide; $('#score').classList.toggle('guide-on',!!set.guide); }
+function setGuide(on){ set.guide=!!on; save(); syncGuide(); }
+$('#guide').addEventListener('change',e=>setGuide(e.target.checked));
+$('#bGuide').addEventListener('click',()=>{ setGuide(!set.guide); say(set.guide?'Línea guía visible':'Línea guía oculta'); });
 
 /* ---------- Diálogo ---------- */
 // <dialog> modal: atrapa el foco, Esc lo cierra y al cerrarse el foco vuelve al botón que lo abrió

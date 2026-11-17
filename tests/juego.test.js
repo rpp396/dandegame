@@ -178,6 +178,20 @@ suite('Juego', async ({ b, URL, ok, MOB, page, open, until, wf, scheduleTaps, op
   await p.keyboard.press('Escape'); await waitStopped(p);
   ok(await p.evaluate(() => cleanSettings({ diff: '__proto__' }).diff === 'normal' && cleanSettings({ diff: 'dificil' }).diff === 'dificil'), 'cleanSettings: solo dificultades conocidas');
   await p.click('#diffSeg [data-diff="normal"]');
+
+  // 12b) línea guía: recorre el pentagrama durante la pasada y se oculta con su botón
+  await openScene(p, 0, 120);
+  await p.click('#bPractice'); await waitRunning(p, 'practice');
+  await until(p, () => __t.S.running && __t.heardAt() > __t.S.passStart + 0.3, null, 8000);
+  const gx = () => p.evaluate(() => { const v = [...document.querySelectorAll('#score line.guide')].filter(l => l.getAttribute('visibility') === 'visible'); return { n: v.length, x: v.length ? +v[0].getAttribute('x1') : -1 }; });
+  const g1 = await gx(); await p.waitForTimeout(400); const g2 = await gx();
+  ok(g1.n === 1 && g2.n === 1 && g2.x > g1.x && await p.evaluate(() => getComputedStyle(document.querySelector('#score line.guide')).display !== 'none'), `la línea guía avanza por el pentagrama (${g1.x} → ${g2.x})`);
+  await p.click('#bGuide');
+  ok(await p.evaluate(() => !set.guide && document.querySelector('#bGuide').getAttribute('aria-pressed') === 'false' && getComputedStyle(document.querySelector('#score line.guide')).display === 'none' && JSON.parse(localStorage.getItem('orquesta-desafinada-ajustes-v1')).guide === false && __t.S.running), '«Línea guía» la oculta sin parar la escena y se guarda');
+  await p.click('#bGuide');
+  ok(await p.evaluate(() => set.guide && document.querySelector('#score').classList.contains('guide-on')), 'y la vuelve a mostrar');
+  await p.keyboard.press('Escape'); await waitStopped(p);
+  ok(await p.evaluate(() => [...document.querySelectorAll('#score line.guide')].every(l => l.getAttribute('visibility') === 'hidden') && cleanSettings({ guide: 'x' }).guide === true && cleanSettings({ guide: false }).guide === false), 'al parar se oculta; cleanSettings valida guide');
   ok(p.errs.length === 0 && (await p.csp()).length === 0, 'avance y dificultad sin errores ni CSP ' + p.errs.join(' | '));
   await p.context().close();
 

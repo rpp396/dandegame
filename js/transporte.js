@@ -102,6 +102,24 @@ function followScore(i){
   const nxt=sys.nextElementSibling, top=sys.getBoundingClientRect().top, bottom=(nxt||sys).getBoundingClientRect().bottom;
   if(top<8 || bottom>innerHeight-fabReserve()-stageReserve()) scrollTo({top:scrollY+top-16, behavior:smooth()});
 }
+// Línea guía: recorre el pentagrama al ritmo de la pasada (tk = tick desde el principio del ritmo), de la nota que suena hacia la
+// siguiente (o hacia el final del compás). Solo una visible a la vez, en el sistema de esa nota; tk < 0 o null la oculta
+function guideAt(tk){
+  const lines=document.querySelectorAll('#score line.guide');
+  let si=-1, x=0;
+  if(tk!=null && score && score.geo){
+    const t=Math.max(0,tk), e=score.flat.find(v=>t>=v.abs && t<v.abs+v.dur);
+    if(e && e.x!=null && score.geo[e.m]){
+      const nx=score.flat[e.i+1], end=nx && nx.m===e.m ? nx.x : score.geo[e.m].end;
+      si=score.geo[e.m].si; x=e.x+(t-e.abs)/e.dur*(end-e.x);
+    }
+  }
+  lines.forEach((l,k)=>{
+    if(k!==si){ if(k===S.guideSys) l.setAttribute('visibility','hidden'); return; }
+    l.setAttribute('x1',x.toFixed(1)); l.setAttribute('x2',x.toFixed(1)); l.setAttribute('visibility','visible');
+  });
+  S.guideSys=si;
+}
 function showCount(c){
   const fm=$('#fabMain'), ft=c?String(c):'Toca aquí';
   if(S.mode!=='play' && fm.textContent!==ft){ fm.textContent=ft; fm.classList.toggle('count',!!c); }   // en «Escuchar» el botón es «Detener» (la cuenta va en la partitura)
@@ -114,15 +132,15 @@ function frame(){
   if(S.mode==='calib'){ calibFrame(heard); return; }
   while(S.visPtr+1<S.vis.length && S.vis[S.visPtr+1].t<=heard) S.visPtr++;
   const v=S.vis[S.visPtr];
-  if(heard<S.passStart) showCount(v && v.t<=heard ? v.count : '');
+  if(heard<S.passStart){ showCount(v && v.t<=heard ? v.count : ''); guideAt(0); }   // en la cuenta, la guía espera en la primera nota
   else {
     showCount('');
     const rel=heard-S.passStart;
     if(rel>=S.passDur){
-      setNow(-1);
+      setNow(-1); guideAt(null);
       if(rel>S.passDur+0.35){ finish(); return; }
     } else {
-      const tk=rel/S.spt;
+      const tk=rel/S.spt; guideAt(tk);
       let idx=-1; for(const e of score.flat){ if(tk>=e.abs && tk<e.abs+e.dur){ idx=e.i; break; } }
       setNow(idx);
     }
@@ -137,7 +155,7 @@ function stop(){
     try{ bus.gain.setTargetAtTime(0,ctx.currentTime,0.01); setTimeout(()=>{ try{bus.disconnect();}catch(e){} },300); }catch(e){}
     stopSources();
   }
-  setNow(-1); showCount('');
+  setNow(-1); showCount(''); guideAt(null);
   const was=S.running; S.running=false;
   if(was) gameStop();
   padIdle();

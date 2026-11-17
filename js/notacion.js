@@ -90,6 +90,7 @@ function renderScore(){
   const {L,measures}=score;
   const base=measures.map(evs=>{ const inner=sum(evs.map(evW)); return Math.max(inner*k, L*2.9*k)+26; });
   const systems=[]; let cur=[], used=0;
+  score.geo=[];   // por compás: sistema y x donde acaba (para la línea guía)
   base.forEach((w,mi)=>{
     const avail=W-(systems.length===0?PF:PO)-4;
     if(cur.length && used+w>avail){ systems.push({mis:cur,used}); cur=[]; used=0; }
@@ -111,6 +112,7 @@ function renderScore(){
     let x=pre;
     sys.mis.forEach(mi=>{
       const MW=base[mi]*f;
+      score.geo[mi]={si, end:x+MW-8};
       s+=measureSVG(mi,x,MW);
       x+=MW;
       if(mi===measures.length-1) s+=`<line class="bar" x1="${x-6}" y1="${Y0}" x2="${x-6}" y2="${Y0+40}"/><rect class="barthick" x="${x-3.5}" y="${Y0}" width="3.5" height="40"/>`;
@@ -123,9 +125,13 @@ function renderScore(){
       if(e.tie && !inSys.has(score.flat[e.i-1].m)) s+=tieSVG(pre-6,e.x-4,ty);
       if(nx && nx.tie) s+=tieSVG(e.x+4, inSys.has(nx.m) ? nx.x-4 : endX-2, ty);
     }));
+    // línea guía: la mueve guideAt (transporte.js) y se oculta sin la clase guide-on de #score
+    s+=`<line class="guide" x1="0" y1="${Y0-9}" x2="0" y2="${Y0+49}" visibility="hidden"/>`;
     html+=s+'</svg>';
   });
   host.innerHTML=html;
+  host.classList.toggle('guide-on',!!set.guide);
+  S.guideSys=-1;
   evEls=[];
   host.querySelectorAll('.ev').forEach(g=>{ evEls[+g.dataset.i]=g; });
   if(S.running && S.nowI>=0 && evEls[S.nowI]) evEls[S.nowI].classList.add('now');

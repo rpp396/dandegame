@@ -205,6 +205,12 @@ kbd{font-family:var(--mono);font-size:11px;border:1px solid var(--line);border-b
 .practice{display:flex;flex-direction:column;gap:12px}
 .p-actions{display:flex;flex-wrap:wrap;gap:8px 10px;align-items:center}
 .p-actions .btn{justify-content:center}
+.p-opts{display:flex;flex-wrap:wrap;gap:8px}
+#bGuide[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);box-shadow:inset 0 -3px 0 var(--accent)}
+#bGuide[aria-pressed="false"] svg path:last-child{opacity:.35}
+/* línea guía de la partitura (la mueve guideAt; sin .guide-on no se ve) */
+.guide{stroke:var(--accent);stroke-width:2.4;stroke-linecap:round;opacity:.75;pointer-events:none}
+#score:not(.guide-on) .guide{display:none}
 @media (max-width:620px){ .p-actions .btn.big{flex:1 1 100%} .p-actions .btn:not(.big){flex:1 1 0} }
 .p-offset{font-size:12px;color:var(--muted);margin:0}
 .p-offset b{font-family:var(--mono);color:var(--ink);font-weight:500}
@@ -396,10 +402,11 @@ body.fab-on{padding-bottom:140px}
   .track::after{background:ButtonText;box-shadow:none}
   .sw input:checked + .track{background:Highlight;border-color:Highlight}
   .sw input:checked + .track::after{background:HighlightText}
-  .modeseg button[aria-pressed="true"]{text-decoration:underline;text-decoration-thickness:3px;text-underline-offset:4px}
+  .modeseg button[aria-pressed="true"],#bGuide[aria-pressed="true"]{text-decoration:underline;text-decoration-thickness:3px;text-underline-offset:4px}
   .sc[aria-current="true"],.pad.live{border-width:3px}
   .stars .on{color:Highlight}
   .ev.now{color:Highlight}
+  .guide{stroke:Highlight;opacity:1}
   .fab,.fab-restart{border:2px solid ButtonText}
   .skip:focus{outline:2px solid Highlight}
 }
